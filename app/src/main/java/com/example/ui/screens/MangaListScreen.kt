@@ -2584,7 +2584,7 @@ fun SettingsTabContent(viewModel: MainViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Version", style = MaterialTheme.typography.bodyMedium, color = ThemeOnSurfaceVariant)
-                        Text("1.0.0 (Pro)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                        Text("v${com.example.BuildConfig.VERSION_NAME} (Pro)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),

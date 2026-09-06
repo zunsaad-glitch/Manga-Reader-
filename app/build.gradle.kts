@@ -15,8 +15,8 @@ android {
         applicationId = "com.example"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 252
+        versionName = "2.5.2"
 
         buildConfigField("String", "GEMINI_API_KEY", "\"AQ.Ab8RN6IyXgkA3sFim_zoXVQ_VzFsSZGEucCE2O6m_k8Lh4PO4g\"")
         buildConfigField("String", "MANGADEX_CLIENT_ID", "\"dummy\"")

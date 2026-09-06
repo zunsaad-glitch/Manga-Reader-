@@ -390,7 +390,7 @@ fun SettingsScreen(
                     SettingsRowItem(
                         icon = Icons.Filled.Layers,
                         title = "Version",
-                        subtitle = "2.5.0 (Build 2026.08)"
+                        subtitle = "v${com.example.BuildConfig.VERSION_NAME} (Build ${com.example.BuildConfig.VERSION_CODE})"
                     )
                 }
             }
