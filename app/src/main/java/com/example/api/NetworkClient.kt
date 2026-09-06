@@ -18,6 +18,19 @@ object NetworkClient {
     @Volatile
     private var instance: OkHttpClient? = null
 
+    // Track hosts where direct connection is blocked by ISP/firewall/DPI on this device
+    private val blockedDirectHosts = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    private val PHOTON_SHARDS = listOf("i0.wp.com", "i1.wp.com", "i2.wp.com", "i3.wp.com")
+
+    fun getPhotonUrl(url: okhttp3.HttpUrl): String {
+        val shard = PHOTON_SHARDS[kotlin.math.abs(url.hashCode()) % PHOTON_SHARDS.size]
+        val cleanHost = url.host
+        val path = url.encodedPath
+        val query = if (url.query != null) "?${url.query}" else ""
+        return "https://$shard/$cleanHost$path$query"
+    }
+
     /**
      * Bypasses ISP DNS blocking / SNI filtering (e.g. in Pakistan) by:
      * 1. Direct hardcoded bootstrap DNS mapping for CDN image servers to eliminate DNS poisoning.
@@ -99,15 +112,22 @@ object NetworkClient {
             emptyMap()
         }
 
-        // Combined resilient DNS - prioritizing fast native Android system DNS
+        // Combined resilient DNS - prioritizing fast native Android system DNS while rejecting ISP sinkholes
         val resilientDns = object : Dns {
             override fun lookup(hostname: String): List<InetAddress> {
-                // 1. Fast Native Android OS DNS
+                // 1. Fast Native Android OS DNS (filter out ISP sinkhole / bogon IPs)
                 try {
                     val systemResult = Dns.SYSTEM.lookup(hostname)
-                    val v4 = systemResult.filter { it is Inet4Address }
+                    val v4 = systemResult.filter {
+                        it is Inet4Address &&
+                                !it.isLoopbackAddress &&
+                                !it.isAnyLocalAddress &&
+                                !it.isSiteLocalAddress &&
+                                it.hostAddress != "0.0.0.0" &&
+                                it.hostAddress != "127.0.0.1"
+                    }
                     if (v4.isNotEmpty()) return v4
-                    if (systemResult.isNotEmpty()) return systemResult
+                    if (systemResult.isNotEmpty() && systemResult.none { it.isLoopbackAddress || it.isAnyLocalAddress }) return systemResult
                 } catch (_: Exception) {}
 
                 // 2. Cloudflare DoH fallback
@@ -187,35 +207,87 @@ object NetworkClient {
                 }
             }
 
+            val path = originalUrl.encodedPath.lowercase()
+            val isCdnImage = host.contains("nhentai") || host.contains("pururin") ||
+                    host.contains("hentaifox") || host.contains("3hentai") ||
+                    host.contains("mangadex") || host.contains("simply-hentai") ||
+                    host.contains("asmhentai") ||
+                    path.endsWith(".jpg") || path.endsWith(".jpeg") ||
+                    path.endsWith(".png") || path.endsWith(".webp") ||
+                    path.endsWith(".gif") || path.contains("/covers/") ||
+                    path.contains("/galleries/")
+
+            // Helper to fetch via WordPress Photon edge CDN
+            fun tryPhoton(): okhttp3.Response? {
+                return try {
+                    val photonUrl = getPhotonUrl(originalUrl)
+                    val photonReq = original.newBuilder()
+                        .url(photonUrl)
+                        .header("Referer", "https://$host/")
+                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+                        .build()
+                    val resp = chain.proceed(photonReq)
+                    if (resp.isSuccessful) resp else { resp.close(); null }
+                } catch (_: Exception) {
+                    null
+                }
+            }
+
+            // Helper to fetch via CorsProxy.io
+            fun tryCorsProxy(): okhttp3.Response? {
+                return try {
+                    val encodedUrl = java.net.URLEncoder.encode(originalUrl.toString(), "UTF-8")
+                    val corsReq = original.newBuilder()
+                        .url("https://corsproxy.io/?url=$encodedUrl")
+                        .header("Referer", "https://corsproxy.io/")
+                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36")
+                        .build()
+                    val resp = chain.proceed(corsReq)
+                    if (resp.isSuccessful) resp else { resp.close(); null }
+                } catch (_: Exception) {
+                    null
+                }
+            }
+
+            // Fast-path: If this CDN host was already confirmed blocked by ISP/firewall on this device,
+            // immediately bypass to Photon edge mirror to prevent any request hanging.
+            if (isCdnImage && blockedDirectHosts.contains(host)) {
+                tryPhoton()?.let { return@addInterceptor it }
+                tryCorsProxy()?.let { return@addInterceptor it }
+            }
+
             var response: okhttp3.Response? = null
             var requestException: Exception? = null
 
             try {
-                response = chain.proceed(reqBuilder.build())
+                val directChain = if (isCdnImage) {
+                    chain.withConnectTimeout(3500, TimeUnit.MILLISECONDS)
+                        .withReadTimeout(8, TimeUnit.SECONDS)
+                } else {
+                    chain
+                }
+                response = directChain.proceed(reqBuilder.build())
                 if (response.isSuccessful) {
                     return@addInterceptor response
                 }
             } catch (e: Exception) {
                 requestException = e
+                if (isCdnImage) {
+                    blockedDirectHosts.add(host)
+                }
             }
 
-            // High-reliability edge proxy fallback for CDN images (covers 403, 404, DNS blocking)
-            if (host.contains("nhentai.net") || host.contains("pururin") || host.contains("hentaifox")) {
-                val fullPath = originalUrl.encodedPath
-                val proxyUrlStr = "https://wsrv.nl/?url=${originalUrl.host}${fullPath}"
-                val proxyReq = original.newBuilder()
-                    .url(proxyUrlStr)
-                    .header("Referer", "https://wsrv.nl/")
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .build()
-                try {
-                    val proxyResp = chain.proceed(proxyReq)
-                    if (proxyResp.isSuccessful) {
-                        response?.close()
-                        return@addInterceptor proxyResp
-                    }
-                    proxyResp.close()
-                } catch (_: Exception) {}
+            // High-reliability edge proxy fallback for CDN images (covers 403, 404, 502, ISP blocking, DNS tampering)
+            if (isCdnImage) {
+                blockedDirectHosts.add(host)
+                tryPhoton()?.let {
+                    response?.close()
+                    return@addInterceptor it
+                }
+                tryCorsProxy()?.let {
+                    response?.close()
+                    return@addInterceptor it
+                }
             }
 
             if (response != null) {
