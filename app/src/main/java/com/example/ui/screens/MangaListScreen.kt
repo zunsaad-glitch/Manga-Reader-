@@ -640,6 +640,10 @@ fun HomeScreenContent(
     val manhwaCategoryList by viewModel.manhwaCategoryList.collectAsState()
     val mangaCategoryList by viewModel.mangaCategoryList.collectAsState()
     val manhuaCategoryList by viewModel.manhuaCategoryList.collectAsState()
+    val manhwaToonList by viewModel.manhwaToonList.collectAsState()
+    val manhwaToonSort by viewModel.manhwaToonSort.collectAsState()
+    val manhwaToonGenre by viewModel.manhwaToonGenre.collectAsState()
+    val isManhwaToonLoading by viewModel.isManhwaToonLoading.collectAsState()
     val cultivationGoatMangas by viewModel.cultivationGoatMangas.collectAsState()
     val goatMangas by viewModel.goatMangas.collectAsState()
     val fullColorMangas by viewModel.fullColorMangas.collectAsState()
@@ -768,10 +772,11 @@ fun HomeScreenContent(
         mangas, fullColorMangas, adultWebtoonsList, matureNtrLibrary,
         ecchiComicsList, threeDComicsList, goatMangas, adultComicsList,
         parodyMangasList, manhwaCategoryList, mangaCategoryList, manhuaCategoryList,
-        comicsCategoryList, doujinshiList, selectedCategory
+        comicsCategoryList, doujinshiList, manhwaToonList, selectedCategory
     ) {
         mapOf(
             MangaCategory.ALL to mangas.size,
+            MangaCategory.MANHWATOON to (if (manhwaToonList.isNotEmpty()) manhwaToonList.size else 14),
             MangaCategory.FULL_COLOR to fullColorMangas.size,
             MangaCategory.WEBTOONS to maxOf(comicsCategoryList.size, 25),
             MangaCategory.ADULT_WEBTOONS to adultWebtoonsList.size,
@@ -1059,24 +1064,191 @@ fun HomeScreenContent(
                 }
             }
 
-            // Slide of Fresh Releases on top (excluding completed mangas)
-            if (freshMangas.isNotEmpty()) {
+            // ManhwaToon Dedicated Live Scraper Controls & Status
+            if (selectedCategory == MangaCategory.MANHWATOON) {
                 item {
-                    FreshReleasesSlider(
-                        mangas = freshMangas,
-                        onClick = { handleCardClick(it) }
-                    )
-                }
-            } else if (featuredManga != null) {
-            item {
-                featuredManga?.let { manga ->
-                    EditorPickHeroCard(
-                        manga = manga,
-                        onClick = { handleCardClick(manga) }
-                    )
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1B112C)),
+                        border = BorderStroke(1.dp, Color(0xFFAB47BC).copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(0xFF9C27B0).copy(alpha = 0.25f),
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text("⚡", fontSize = 18.sp)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            "ManhwaToon.me Scraper",
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFF3E5F5)
+                                            )
+                                        )
+                                        Text(
+                                            "Live direct HTML scraper from manhwatoon.me",
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = Color(0xFFCE93D8)
+                                            )
+                                        )
+                                    }
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = if (isManhwaToonLoading) Color(0xFFFF9800).copy(alpha = 0.2f) else Color(0xFF4CAF50).copy(alpha = 0.2f),
+                                    border = BorderStroke(1.dp, if (isManhwaToonLoading) Color(0xFFFF9800).copy(alpha = 0.6f) else Color(0xFF4CAF50).copy(alpha = 0.6f))
+                                ) {
+                                    Text(
+                                        if (isManhwaToonLoading) "SCRAPING..." else "LIVE CONNECTED",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = if (isManhwaToonLoading) Color(0xFFFFB74D) else Color(0xFF81C784)
+                                        )
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Sort Order Tabs
+                            Text(
+                                "SORT BY",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFBA68C8)
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val sorts = listOf(
+                                    "latest" to "🔥 Latest",
+                                    "trending" to "📈 Trending",
+                                    "rating" to "⭐ Top Rated",
+                                    "views" to "👀 Most Views",
+                                    "new-manga" to "✨ New Releases"
+                                )
+                                sorts.forEach { (key, label) ->
+                                    val isSortSelected = manhwaToonSort == key
+                                    Surface(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(50))
+                                            .clickable {
+                                                viewModel.fetchManhwaToon(page = 1, sort = key, genre = manhwaToonGenre)
+                                            },
+                                        shape = RoundedCornerShape(50),
+                                        color = if (isSortSelected) Color(0xFF9C27B0) else Color(0xFF2C1945),
+                                        border = BorderStroke(1.dp, if (isSortSelected) Color(0xFFE1BEE7) else Color(0xFF512DA8).copy(alpha = 0.5f))
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                color = if (isSortSelected) Color.White else Color(0xFFD1C4E9),
+                                                fontWeight = if (isSortSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Genre Filter Chips
+                            Text(
+                                "GENRES",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFBA68C8)
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val genres = listOf(
+                                    null to "All Genres",
+                                    "romance" to "💕 Romance",
+                                    "action" to "⚔️ Action",
+                                    "adult" to "🔞 Adult 18+",
+                                    "drama" to "🎭 Drama",
+                                    "fantasy" to "🧙 Fantasy",
+                                    "comedy" to "😂 Comedy",
+                                    "doujinshi" to "🌸 Doujinshi",
+                                    "school-life" to "🏫 School Life"
+                                )
+                                genres.forEach { (key, label) ->
+                                    val isGenreSelected = manhwaToonGenre == key
+                                    Surface(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(50))
+                                            .clickable {
+                                                viewModel.fetchManhwaToon(page = 1, sort = manhwaToonSort, genre = key)
+                                            },
+                                        shape = RoundedCornerShape(50),
+                                        color = if (isGenreSelected) Color(0xFF673AB7) else Color(0xFF2C1945),
+                                        border = BorderStroke(1.dp, if (isGenreSelected) Color(0xFFD1C4E9) else Color(0xFF512DA8).copy(alpha = 0.5f))
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                color = if (isGenreSelected) Color.White else Color(0xFFD1C4E9),
+                                                fontWeight = if (isGenreSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        }
+
+            // Normal carousels are shown when NOT in dedicated ManhwaToon tab
+            if (selectedCategory != MangaCategory.MANHWATOON) {
+                // Slide of Fresh Releases on top (excluding completed mangas)
+                if (freshMangas.isNotEmpty()) {
+                    item {
+                        FreshReleasesSlider(
+                            mangas = freshMangas,
+                            onClick = { handleCardClick(it) }
+                        )
+                    }
+                } else if (featuredManga != null) {
+                    item {
+                        featuredManga?.let { manga ->
+                            EditorPickHeroCard(
+                                manga = manga,
+                                onClick = { handleCardClick(manga) }
+                            )
+                        }
+                    }
+                }
+            }
 
         // Greatest of All Time (GOAT) Masterpieces Carousel
         if (goatMangas.isNotEmpty()) {
@@ -1313,14 +1485,17 @@ fun HomeScreenContent(
         }
 
         // All Manga Feed
+        val displayMangas = if (selectedCategory == MangaCategory.MANHWATOON && manhwaToonList.isNotEmpty()) manhwaToonList else mangas
+        val isFeedLoading = if (selectedCategory == MangaCategory.MANHWATOON) isManhwaToonLoading else isLoading
+
         item {
             SectionHeader(
-                title = "📚 Explore ${selectedCategory.displayName} Directory",
-                subtitle = "${mangas.size} titles loaded"
+                title = if (selectedCategory == MangaCategory.MANHWATOON) "⚡ ManhwaToon Directory" else "📚 Explore ${selectedCategory.displayName} Directory",
+                subtitle = if (selectedCategory == MangaCategory.MANHWATOON) "${displayMangas.size} titles scraped live" else "${displayMangas.size} titles loaded"
             )
         }
 
-        if (isLoading && mangas.isEmpty()) {
+        if (isFeedLoading && displayMangas.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier
@@ -1332,7 +1507,7 @@ fun HomeScreenContent(
                 }
             }
         } else {
-            items(mangas) { manga ->
+            items(displayMangas) { manga ->
                 val isBookmarked = bookmarkedIds.contains(manga.id)
                 val isFav = favoriteIds.contains(manga.id)
                 MangaFeedCard(

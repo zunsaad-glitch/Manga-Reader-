@@ -1,6 +1,7 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.api.*
@@ -35,6 +36,7 @@ enum class MangaCategory(
     val tagId: String? = null
 ) {
     ALL("All", null),
+    MANHWATOON("⚡ ManhwaToon", listOf("ko", "en"), listOf("safe", "suggestive", "erotica", "pornographic")),
     FULL_COLOR("🌈 Full Color", null, listOf("safe", "suggestive", "erotica", "pornographic"), "f5ba408b-0e7a-484d-8d49-4e9125ac96de"),
     WEBTOONS("📱 Webtoons", null, listOf("safe", "suggestive", "erotica", "pornographic"), "e197df38-d0e7-43b5-9b09-2842d0c326dd"),
     ADULT_WEBTOONS("🔞 18+ Webtoons", listOf("ko", "ja", "zh", "en"), listOf("erotica", "pornographic")),
@@ -724,6 +726,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val manhwaCategoryList = MutableStateFlow<List<MangaData>>(emptyList())
     val manhuaCategoryList = MutableStateFlow<List<MangaData>>(emptyList())
     val comicsCategoryList = MutableStateFlow<List<MangaData>>(emptyList())
+    val manhwaToonList = MutableStateFlow<List<MangaData>>(emptyList())
+    val manhwaToonSort = MutableStateFlow("latest")
+    val manhwaToonGenre = MutableStateFlow<String?>(null)
+    val isManhwaToonLoading = MutableStateFlow(false)
     val specialInterestMangas = MutableStateFlow<List<MangaData>>(emptyList())
     val cultivationGoatMangas = MutableStateFlow<List<MangaData>>(emptyList())
     val overflowMangas = MutableStateFlow<List<MangaData>>(emptyList())
@@ -790,6 +796,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             fetchCultivationGoatMangas()
             fetchOverflowMangas()
             fetchFeaturedAuthors()
+            fetchManhwaToon()
         }
     }
 
@@ -979,236 +986,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun fetchThreeDComics() {
         viewModelScope.launch {
             try {
-                val curated3d = listOf(
-                    MangaData(
-                        id = "3d_kunoichi",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[Studio FOW] Kunoichi 3DCG Chronicles [Full Color 3D]"),
-                            description = mapOf("en" to "High-end 3D rendered ninja espionage action comic in full 3D cinematic color."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_kunoichi", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_kunoichi"))),
-                            Relationship(id = "studio_fow", type = "author", attributes = RelationshipAttributes(name = "Studio FOW"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_re_claire",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[3D Fantasy] Resident Evil - Claire & Jill 3DCG Special [English]"),
-                            description = mapOf("en" to "Survival horror 3D graphic comic featuring Claire Redfield and Jill Valentine."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_re_claire", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_re_claire"))),
-                            Relationship(id = "fantasy3d", type = "author", attributes = RelationshipAttributes(name = "3D Fantasy Renders"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_cyberpunk",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[Project 3D] Cyberpunk 2077 - Night City Stories 3DCG"),
-                            description = mapOf("en" to "A photorealistic 3D graphic novel set in neon-drenched Night City."),
-                            originalLanguage = "en",
-                            contentRating = "erotica",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_cyberpunk", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_cyberpunk"))),
-                            Relationship(id = "proj3d", type = "author", attributes = RelationshipAttributes(name = "Project 3D"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_tifa_ff7",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[Cherry Bomb] Final Fantasy VII - Tifa & Aerith 3D Rendered Comic"),
-                            description = mapOf("en" to "Stunning 3D CG comic capturing Sector 7 Seventh Heaven nightlife."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_tifa_ff7", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_tifa_ff7"))),
-                            Relationship(id = "cherry_bomb", type = "author", attributes = RelationshipAttributes(name = "Cherry Bomb 3D"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_milftoon_suburban",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[MilfToon] Suburban Secrets - 3DCG Graphic Novel Vol. 1"),
-                            description = mapOf("en" to "Classic Western 3D graphic novel series exploring neighborhood intrigue."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_milftoon_suburban", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_milftoon_suburban"))),
-                            Relationship(id = "milftoon", type = "author", attributes = RelationshipAttributes(name = "MilfToon Renders"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_sinful_dreams",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[Studio Lust] 3D Sinful Dreams - Episode 1 [3DCG]"),
-                            description = mapOf("en" to "Full-color 3D graphic webtoon following luxury penthouse romance."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_sinful_dreams", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_sinful_dreams"))),
-                            Relationship(id = "studio_lust", type = "author", attributes = RelationshipAttributes(name = "Studio Lust"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_witch_hunter",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[RedGrave] Witch Hunter - 3D Western Graphic Novel [English]"),
-                            description = mapOf("en" to "Dark fantasy 3D graphic novel featuring monster hunters and enchantresses."),
-                            originalLanguage = "en",
-                            contentRating = "erotica",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_witch_hunter", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_witch_hunter"))),
-                            Relationship(id = "redgrave", type = "author", attributes = RelationshipAttributes(name = "RedGrave 3D"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_supergirl",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[3D Hentai] Supergirl & Power Girl - 3DCG Comics Anthology"),
-                            description = mapOf("en" to "Superheroine comic rendered in high-definition 3D CG modeling."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_supergirl", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_supergirl"))),
-                            Relationship(id = "cg_heroes", type = "author", attributes = RelationshipAttributes(name = "CG Heroes"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_overwatch",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[RenderVerse] Overwatch - Mercy & D.Va 3D Chronicles [Full Color]"),
-                            description = mapOf("en" to "Sci-fi 3D rendered graphic story of heroines taking downtime."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_overwatch", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_overwatch"))),
-                            Relationship(id = "renderverse", type = "author", attributes = RelationshipAttributes(name = "RenderVerse"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_raiden_genshin",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[CG Comic] Genshin Impact - Raiden Shogun & Yae Miko 3DCG Story"),
-                            description = mapOf("en" to "Inazuma realm 3D graphic comic in vivid high resolution."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_raiden_genshin", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_raiden_genshin"))),
-                            Relationship(id = "genshin_cg", type = "author", attributes = RelationshipAttributes(name = "Genshin 3D Studio"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_samus_metroid",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[Studio Ethereal] Metroid - Samus Aran 3DCG Mission [Full 3D]"),
-                            description = mapOf("en" to "Space bounty hunter Samus in a cinematic 3D graphic novel adventure."),
-                            originalLanguage = "en",
-                            contentRating = "erotica",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_samus_metroid", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_samus_metroid"))),
-                            Relationship(id = "studio_ethereal", type = "author", attributes = RelationshipAttributes(name = "Studio Ethereal"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_2b_nier",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[DreamCatcher] Nier Automata - 2B Combat & Intimacy 3DCG [Full Color]"),
-                            description = mapOf("en" to "Android YoRHa 2B in a deep emotional 3D graphic novel adaptation."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_2b_nier", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_2b_nier"))),
-                            Relationship(id = "dreamcatcher", type = "author", attributes = RelationshipAttributes(name = "DreamCatcher 3D"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_ahsoka_starwars",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[Apex 3D] Star Wars - Ahsoka Tano 3DCG Graphic Series"),
-                            description = mapOf("en" to "Sci-fi Jedi adventure in full 3D graphic rendering."),
-                            originalLanguage = "en",
-                            contentRating = "erotica",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_ahsoka_starwars", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_ahsoka_starwars"))),
-                            Relationship(id = "apex3d", type = "author", attributes = RelationshipAttributes(name = "Apex 3D"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_chunli_sf",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[CG Master] Street Fighter - Chun-Li & Cammy 3DCG Comic"),
-                            description = mapOf("en" to "Martial arts heroines Chun-Li and Cammy in high-detail 3D art."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_chunli_sf", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_chunli_sf"))),
-                            Relationship(id = "cg_master", type = "author", attributes = RelationshipAttributes(name = "CG Master"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_lara_tombraider",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[3D Realm] Tomb Raider - Lara Croft 3D Adventures [English]"),
-                            description = mapOf("en" to "Lara Croft exploring ancient Mesoamerican ruins in 3D graphic novel form."),
-                            originalLanguage = "en",
-                            contentRating = "erotica",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_lara_tombraider", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_lara_tombraider"))),
-                            Relationship(id = "realm3d", type = "author", attributes = RelationshipAttributes(name = "3D Realm"))
-                        )
-                    ),
-                    MangaData(
-                        id = "3d_kasumi_doa",
-                        attributes = MangaAttributes(
-                            title = mapOf("en" to "[Digital CG] Dead or Alive - Kasumi & Honoka 3DCG Special"),
-                            description = mapOf("en" to "Island resort vacation and martial arts rendered in 3D perfection."),
-                            originalLanguage = "en",
-                            contentRating = "pornographic",
-                            status = "completed"
-                        ),
-                        relationships = listOf(
-                            Relationship(id = "3d_kasumi_doa", type = "cover_art", attributes = RelationshipAttributes(fileName = com.example.repository.JandaPressRepository.getVerifiedCoverUrl("3d_kasumi_doa"))),
-                            Relationship(id = "digital_cg", type = "author", attributes = RelationshipAttributes(name = "Digital CG"))
-                        )
-                    )
-                )
-
                 val combined = mutableListOf<MangaData>()
                 val existingIds = mutableSetOf<String>()
 
+                // 1. Curated 3D Comics & CG Graphic Novels with multi-chapter series
+                val curated3d = com.example.repository.ThreeDComicsRepository.getAll3DComics()
                 for (m in curated3d) {
                     if (existingIds.add(m.id)) combined.add(m)
                 }
@@ -1522,10 +1304,69 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var fetchMangaDetailJob: kotlinx.coroutines.Job? = null
 
+    private var manhwaToonPageNumber = 1
+
+    fun fetchManhwaToon(page: Int = 1, sort: String = "latest", genre: String? = null) {
+        viewModelScope.launch {
+            isManhwaToonLoading.value = true
+            manhwaToonSort.value = sort
+            manhwaToonGenre.value = genre
+            manhwaToonPageNumber = page
+            try {
+                if (manhwaToonList.value.isEmpty()) {
+                    val snapshot = com.example.repository.ManhwaToonRepository.getCuratedSnapshot()
+                    manhwaToonList.value = snapshot
+                    if (selectedCategory.value == MangaCategory.MANHWATOON) {
+                        mangas.value = snapshot
+                    }
+                }
+                val list = com.example.repository.ManhwaToonRepository.getMangaList(page, sort, genre)
+                if (list.isNotEmpty()) {
+                    manhwaToonList.value = list
+                    if (selectedCategory.value == MangaCategory.MANHWATOON) {
+                        mangas.value = list
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error fetching ManhwaToon", e)
+            } finally {
+                isManhwaToonLoading.value = false
+                isLoading.value = false
+            }
+        }
+    }
+
+    fun loadMoreManhwaToon() {
+        viewModelScope.launch {
+            if (isManhwaToonLoading.value) return@launch
+            isManhwaToonLoading.value = true
+            manhwaToonPageNumber++
+            try {
+                val nextPage = com.example.repository.ManhwaToonRepository.getMangaList(
+                    page = manhwaToonPageNumber,
+                    sortOrder = manhwaToonSort.value,
+                    genre = manhwaToonGenre.value
+                )
+                if (nextPage.isNotEmpty()) {
+                    val combined = (manhwaToonList.value + nextPage).distinctBy { it.id }
+                    manhwaToonList.value = combined
+                    if (selectedCategory.value == MangaCategory.MANHWATOON) {
+                        mangas.value = combined
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error loading more ManhwaToon", e)
+            } finally {
+                isManhwaToonLoading.value = false
+            }
+        }
+    }
+
     fun fetchMangaDetail(mangaId: String) {
         fetchMangaDetailJob?.cancel()
         fetchMangaDetailJob = viewModelScope.launch {
-            val local = mangas.value.find { it.id == mangaId }
+            val local = manhwaToonList.value.find { it.id == mangaId }
+                ?: mangas.value.find { it.id == mangaId }
                 ?: searchMangas.value.find { it.id == mangaId }
                 ?: libraryMangas.value.find { it.id == mangaId }
                 ?: authorWorks.value.find { it.id == mangaId }
@@ -1548,6 +1389,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentMangaDetail.value = local
             if (local != null) {
                 fetchSimilarMangas(local)
+            }
+
+            // Scraped ManhwaToon detail check
+            if (com.example.repository.ManhwaToonRepository.isManhwaToonId(mangaId)) {
+                val mtDetail = com.example.repository.ManhwaToonRepository.getMangaDetails(mangaId)
+                if (mtDetail != null) {
+                    currentMangaDetail.value = mtDetail
+                    fetchSimilarMangas(mtDetail)
+                    return@launch
+                }
             }
 
             try {
@@ -2069,6 +1920,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             homeOffset = 0
             hasMoreHome.value = true
             try {
+                if (selectedCategory.value == MangaCategory.MANHWATOON) {
+                    fetchManhwaToon(page = 1, sort = manhwaToonSort.value, genre = manhwaToonGenre.value)
+                    return@launch
+                }
+
                 val is3d = selectedCategory.value == MangaCategory.COMIC_3D || selectedTag.value.contains("3D", ignoreCase = true)
                 val isEcchi = selectedCategory.value == MangaCategory.ECCHI || selectedTag.value.equals("Ecchi", ignoreCase = true) || selectedTag.value.equals("Smut", ignoreCase = true)
 
@@ -2159,6 +2015,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun loadMoreMangas() {
         if (isLoadingMoreHome.value || !hasMoreHome.value || isLoading.value) return
         viewModelScope.launch {
+            if (selectedCategory.value == MangaCategory.MANHWATOON) {
+                loadMoreManhwaToon()
+                return@launch
+            }
+
             isLoadingMoreHome.value = true
             try {
                 val is3d = selectedCategory.value == MangaCategory.COMIC_3D || selectedTag.value.contains("3D", ignoreCase = true)
@@ -2345,6 +2206,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             searchOffset = 0
             hasMoreSearch.value = true
             try {
+                if (selectedCategory.value == MangaCategory.MANHWATOON) {
+                    val mtResults = com.example.repository.ManhwaToonRepository.searchManga(query)
+                    searchMangas.value = mtResults
+                    hasMoreSearch.value = false
+                    isSearching.value = false
+                    return@launch
+                }
                 val ratings = selectedCategory.value.defaultRatings ?: getActiveRatings()
                 var finalTitle: String? = null
                 val finalTags = mutableListOf<String>()
@@ -2675,11 +2543,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // If we don't have images yet, fetch them
                 val pagesToDownload = mutableListOf<String>()
-                if (chapter.id.startsWith("janda_") || chapter.id.startsWith("pururin_") || 
+                if (com.example.repository.ManhwaToonRepository.isManhwaToonId(chapter.id)) {
+                    val mtPages = com.example.repository.ManhwaToonRepository.getChapterImages(chapter.id)
+                    if (mtPages.isNotEmpty()) {
+                        pagesToDownload.addAll(mtPages)
+                    }
+                }
+
+                if (pagesToDownload.isEmpty() && com.example.repository.ThreeDComicsRepository.is3DChapter(chapter.id)) {
+                    val threeDPages = com.example.repository.ThreeDComicsRepository.getPageUrlsForChapter(chapter.id)
+                    if (!threeDPages.isNullOrEmpty()) {
+                        pagesToDownload.addAll(threeDPages)
+                    }
+                }
+
+                if (pagesToDownload.isEmpty() && (chapter.id.startsWith("janda_") || chapter.id.startsWith("pururin_") || 
                     chapter.id.startsWith("hfox_") || chapter.id.startsWith("3h_") || 
                     chapter.id.startsWith("nh_") || chapter.id.startsWith("3d_") ||
                     chapter.id.startsWith("cg_") || chapter.id.startsWith("comic_") ||
-                    chapter.id.startsWith("fb_") || (chapter.id.all { it.isDigit() } && chapter.id.length in 5..8)) {
+                    chapter.id.startsWith("fb_") || (chapter.id.all { it.isDigit() } && chapter.id.length in 5..8))) {
                     val cleanId = chapter.id.removePrefix("janda_")
                     val detail = jandaRepository.getDetail("all", cleanId)
                     if (detail != null && detail.pages.isNotEmpty()) {
@@ -2783,6 +2665,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     updateDisplayedChapters()
                     isLoading.value = false
                     return@launch
+                }
+
+                // 1.5. Check if this is a curated 3D comic manga with full multi-chapter series
+                if (com.example.repository.ThreeDComicsRepository.is3DManga(mangaId)) {
+                    val threeDChapters = com.example.repository.ThreeDComicsRepository.getChaptersForManga(mangaId)
+                    if (!threeDChapters.isNullOrEmpty()) {
+                        allRawChapters.value = threeDChapters
+                        availableLanguages.value = listOf("en")
+                        selectedChapterLanguage.value = "en"
+                        updateDisplayedChapters()
+                        isLoading.value = false
+                        return@launch
+                    }
+                }
+
+                // 1.6. Check if this is a scraped ManhwaToon manga
+                if (com.example.repository.ManhwaToonRepository.isManhwaToonId(mangaId)) {
+                    val mtChapters = com.example.repository.ManhwaToonRepository.getChapters(mangaId)
+                    if (mtChapters.isNotEmpty()) {
+                        allRawChapters.value = mtChapters
+                        availableLanguages.value = listOf("en")
+                        selectedChapterLanguage.value = "en"
+                        updateDisplayedChapters()
+                        isLoading.value = false
+                        return@launch
+                    }
                 }
 
                 // 2. Check if this is a JandaPress / nHentai / gallery ID / 3D / CG / comic ID
@@ -2983,6 +2891,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (!offlineUrls.isNullOrEmpty()) {
                     imageUrls.value = offlineUrls
                     return@launch
+                }
+
+                // 1.5. Check if this is a 3D comic chapter
+                if (com.example.repository.ThreeDComicsRepository.is3DChapter(chapterId)) {
+                    val threeDPages = com.example.repository.ThreeDComicsRepository.getPageUrlsForChapter(chapterId)
+                    if (!threeDPages.isNullOrEmpty()) {
+                        imageUrls.value = threeDPages
+                        return@launch
+                    }
+                }
+
+                // 1.6. Check if this is a scraped ManhwaToon chapter
+                if (com.example.repository.ManhwaToonRepository.isManhwaToonId(chapterId)) {
+                    val mtPages = com.example.repository.ManhwaToonRepository.getChapterImages(chapterId)
+                    if (mtPages.isNotEmpty()) {
+                        imageUrls.value = mtPages
+                        return@launch
+                    }
                 }
 
                 // 2. Check JandaPress / nHentai / numeric gallery providers / 3D / CG / comic / fallback

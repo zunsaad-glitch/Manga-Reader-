@@ -15,8 +15,8 @@ android {
         applicationId = "com.example"
         minSdk = 26
         targetSdk = 36
-        versionCode = 253
-        versionName = "2.5.3"
+        versionCode = 254
+        versionName = "2.5.4"
 
         buildConfigField("String", "GEMINI_API_KEY", "\"AQ.Ab8RN6IyXgkA3sFim_zoXVQ_VzFsSZGEucCE2O6m_k8Lh4PO4g\"")
         buildConfigField("String", "MANGADEX_CLIENT_ID", "\"dummy\"")
@@ -96,6 +96,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.dnsoverhttps)
     implementation(libs.retrofit)
+    implementation("org.jsoup:jsoup:1.18.3")
 
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.androidx.core.ktx)

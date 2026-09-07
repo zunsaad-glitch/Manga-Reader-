@@ -202,6 +202,9 @@ object NetworkClient {
                 host.contains("mangadex.org") || host.contains("mangadex") -> {
                     reqBuilder.header("Referer", "https://mangadex.org/")
                 }
+                host.contains("manhwatoon") -> {
+                    reqBuilder.header("Referer", "https://www.manhwatoon.me/")
+                }
                 else -> {
                     reqBuilder.header("Referer", "https://$host/")
                 }
@@ -211,7 +214,7 @@ object NetworkClient {
             val isCdnImage = host.contains("nhentai") || host.contains("pururin") ||
                     host.contains("hentaifox") || host.contains("3hentai") ||
                     host.contains("mangadex") || host.contains("simply-hentai") ||
-                    host.contains("asmhentai") ||
+                    host.contains("asmhentai") || host.contains("manhwatoon") ||
                     path.endsWith(".jpg") || path.endsWith(".jpeg") ||
                     path.endsWith(".png") || path.endsWith(".webp") ||
                     path.endsWith(".gif") || path.contains("/covers/") ||
