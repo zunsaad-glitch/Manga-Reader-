@@ -13,6 +13,7 @@ import com.example.model.ReadingQuest
 import com.example.repository.JandaPressRepository
 import com.example.repository.NhApiRepository
 import com.example.util.AudioDramaManager
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +28,13 @@ enum class AppTab {
 
 enum class SearchMode {
     TITLE, AUTHOR, TAG
+}
+
+enum class SearchSource(val displayName: String) {
+    ALL("All Sources"),
+    MANHWATOON("⚡ ManhwaToon"),
+    MANGADEX("MangaDex"),
+    COMIC_3D("🧊 3D Comics")
 }
 
 enum class MangaCategory(
@@ -768,6 +776,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val searchQuery = MutableStateFlow("")
     val searchMode = MutableStateFlow(SearchMode.TITLE)
+    val searchSource = MutableStateFlow(SearchSource.ALL)
 
     init {
         // High priority: load essential tags and primary home mangas first
@@ -2150,6 +2159,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         performSearch()
     }
 
+    fun updateSearchSource(source: SearchSource) {
+        searchSource.value = source
+        performSearch()
+    }
+
     fun updateSearchMode(mode: SearchMode) {
         searchMode.value = mode
         if (mode == SearchMode.AUTHOR) {
@@ -2236,10 +2250,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        if (query.isBlank() && selectedCategory.value == MangaCategory.ALL) {
-            searchMangas.value = mangas.value
-            authorSearchResults.value = emptyList()
-            return
+        // Handle blank query based on source or category
+        if (query.isBlank()) {
+            when {
+                searchSource.value == SearchSource.MANHWATOON || selectedCategory.value == MangaCategory.MANHWATOON -> {
+                    searchMangas.value = manhwaToonList.value.ifEmpty { com.example.repository.ManhwaToonRepository.getCuratedSnapshot() }
+                    authorSearchResults.value = emptyList()
+                    isSearching.value = false
+                    hasMoreSearch.value = false
+                    return
+                }
+                searchSource.value == SearchSource.COMIC_3D || selectedCategory.value == MangaCategory.COMIC_3D -> {
+                    searchMangas.value = threeDComicsList.value.ifEmpty { com.example.repository.ThreeDComicsRepository.getAll3DComics() }
+                    authorSearchResults.value = emptyList()
+                    isSearching.value = false
+                    hasMoreSearch.value = false
+                    return
+                }
+                selectedCategory.value == MangaCategory.ALL -> {
+                    searchMangas.value = mangas.value
+                    authorSearchResults.value = emptyList()
+                    isSearching.value = false
+                    hasMoreSearch.value = false
+                    return
+                }
+            }
         }
 
         viewModelScope.launch {
@@ -2247,13 +2282,65 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             searchOffset = 0
             hasMoreSearch.value = true
             try {
-                if (selectedCategory.value == MangaCategory.MANHWATOON) {
+                val qLower = query.lowercase().trim()
+
+                // Check if user specifically requested ManhwaToon or is in ManhwaToon tab
+                val isManhwaToonTarget = searchSource.value == SearchSource.MANHWATOON ||
+                        selectedCategory.value == MangaCategory.MANHWATOON ||
+                        qLower == "manhwatoon" || qLower == "manhwa toon"
+
+                if (isManhwaToonTarget) {
                     val mtResults = com.example.repository.ManhwaToonRepository.searchManga(query)
                     searchMangas.value = mtResults
+                    hasMoreSearch.value = mtResults.size >= 10
+                    isSearching.value = false
+                    return@launch
+                }
+
+                if (searchSource.value == SearchSource.COMIC_3D || selectedCategory.value == MangaCategory.COMIC_3D) {
+                    val threeDMatches = threeDComicsList.value.filter {
+                        val title = it.attributes?.title?.values?.firstOrNull()?.lowercase().orEmpty()
+                        val desc = it.attributes?.description?.values?.firstOrNull()?.lowercase().orEmpty()
+                        title.contains(qLower) || desc.contains(qLower)
+                    }
+                    searchMangas.value = threeDMatches
                     hasMoreSearch.value = false
                     isSearching.value = false
                     return@launch
                 }
+
+                // If TAG mode
+                if (searchMode.value == SearchMode.TAG) {
+                    authorSearchResults.value = emptyList()
+                    if (qLower == "ecchi" || qLower == "smut") {
+                        val ecchiRes = api.getMangaList(
+                            contentRatings = listOf("suggestive", "erotica", "pornographic"),
+                            orderFollowedCount = "desc",
+                            limit = 35,
+                            offset = 0
+                        )
+                        searchMangas.value = ecchiRes.data
+                        searchOffset = ecchiRes.data.size
+                        hasMoreSearch.value = ecchiRes.data.size >= 35
+                        isSearching.value = false
+                        return@launch
+                    } else if (qLower.contains("3d") || qLower == "cg") {
+                        val threeDRes = api.getMangaList(
+                            title = "3D",
+                            contentRatings = listOf("safe", "suggestive", "erotica", "pornographic"),
+                            orderFollowedCount = "desc",
+                            limit = 35,
+                            offset = 0
+                        )
+                        searchMangas.value = if (threeDRes.data.isNotEmpty()) threeDRes.data else threeDComicsList.value
+                        searchOffset = searchMangas.value.size
+                        hasMoreSearch.value = searchMangas.value.size >= 35
+                        isSearching.value = false
+                        return@launch
+                    }
+                }
+
+                // Title or Tag Search with MangaDex
                 val ratings = selectedCategory.value.defaultRatings ?: getActiveRatings()
                 var finalTitle: String? = null
                 val finalTags = mutableListOf<String>()
@@ -2262,56 +2349,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     finalTags.add(selectedCategory.value.tagId!!)
                 }
 
-                when (searchMode.value) {
-                    SearchMode.TITLE -> {
-                        if (query.isNotBlank()) finalTitle = query
-                    }
-                    SearchMode.TAG -> {
-                        authorSearchResults.value = emptyList()
-                        val qLower = query.lowercase().trim()
-                        if (qLower == "ecchi" || qLower == "smut") {
-                            val ecchiRes = api.getMangaList(
-                                contentRatings = listOf("suggestive", "erotica", "pornographic"),
-                                orderFollowedCount = "desc",
-                                limit = 35,
-                                offset = 0
-                            )
-                            searchMangas.value = ecchiRes.data
-                            searchOffset = ecchiRes.data.size
-                            hasMoreSearch.value = ecchiRes.data.size >= 35
-                            isSearching.value = false
-                            return@launch
-                        } else if (qLower.contains("3d") || qLower == "cg") {
-                            val threeDRes = api.getMangaList(
-                                title = "3D",
-                                contentRatings = listOf("safe", "suggestive", "erotica", "pornographic"),
-                                orderFollowedCount = "desc",
-                                limit = 35,
-                                offset = 0
-                            )
-                            searchMangas.value = if (threeDRes.data.isNotEmpty()) threeDRes.data else threeDComicsList.value
-                            searchOffset = searchMangas.value.size
-                            hasMoreSearch.value = searchMangas.value.size >= 35
+                if (searchMode.value == SearchMode.TITLE) {
+                    if (query.isNotBlank()) finalTitle = query
+                } else if (searchMode.value == SearchMode.TAG) {
+                    val matchedTags = availableTags.value.filter { tag ->
+                        val tagName = tag.attributes?.name?.get("en")?.lowercase()
+                            ?: tag.attributes?.name?.values?.firstOrNull()?.lowercase()
+                            ?: ""
+                        tagName.contains(query.lowercase())
+                    }.map { it.id }
+
+                    if (matchedTags.isNotEmpty()) {
+                        finalTags.addAll(matchedTags)
+                    } else if (query.isNotBlank()) {
+                        // Tag query didn't match MangaDex tags; check ManhwaToon
+                        val mtTagMatches = com.example.repository.ManhwaToonRepository.searchManga(query)
+                        if (mtTagMatches.isNotEmpty()) {
+                            searchMangas.value = mtTagMatches
+                            hasMoreSearch.value = mtTagMatches.size >= 10
                             isSearching.value = false
                             return@launch
                         }
-                        val matchedTags = availableTags.value.filter { tag ->
-                            val tagName = tag.attributes?.name?.get("en")?.lowercase() 
-                                ?: tag.attributes?.name?.values?.firstOrNull()?.lowercase() 
-                                ?: ""
-                            tagName.contains(query.lowercase())
-                        }.map { it.id }
-                        
-                        if (matchedTags.isNotEmpty()) {
-                            finalTags.addAll(matchedTags)
-                        } else if (query.isNotBlank()) {
-                            searchMangas.value = emptyList()
-                            isSearching.value = false
-                            return@launch
-                        }
+                        searchMangas.value = emptyList()
+                        isSearching.value = false
+                        return@launch
                     }
-                    else -> {}
                 }
+
+                // Launch concurrent ManhwaToon search if in ALL sources mode and TITLE search
+                val shouldSearchManhwaToon = (searchSource.value == SearchSource.ALL || searchSource.value == SearchSource.MANHWATOON) && searchMode.value == SearchMode.TITLE
+                val mtDeferred: kotlinx.coroutines.Deferred<List<MangaData>>? = if (shouldSearchManhwaToon) {
+                    async {
+                        try {
+                            com.example.repository.ManhwaToonRepository.searchManga(query)
+                        } catch (e: Exception) {
+                            emptyList<MangaData>()
+                        }
+                    }
+                } else null
 
                 val tagsMode = if (searchMode.value == SearchMode.TAG) "OR" else "AND"
                 var response = api.getMangaList(
@@ -2338,11 +2413,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         response = fallbackResponse
                     }
                 }
-                searchMangas.value = response.data
+
+                val mtResults = mtDeferred?.await() ?: emptyList()
+                val threeDMatches = if (searchSource.value == SearchSource.ALL && finalTitle != null) {
+                    threeDComicsList.value.filter {
+                        val t = it.attributes?.title?.values?.firstOrNull()?.lowercase().orEmpty()
+                        t.contains(finalTitle.lowercase())
+                    }
+                } else emptyList()
+
+                // Merge results: ManhwaToon + MangaDex + 3D Comics
+                val combined = (mtResults + response.data + threeDMatches).distinctBy { it.id }
+                searchMangas.value = combined
                 searchOffset = response.data.size
-                hasMoreSearch.value = response.data.size >= 30
+                hasMoreSearch.value = response.data.size >= 30 || mtResults.size >= 10
             } catch (e: Exception) {
                 e.printStackTrace()
+                // On error, check if ManhwaToon has matching titles
+                val mtFallback = com.example.repository.ManhwaToonRepository.searchManga(query)
+                if (mtFallback.isNotEmpty()) {
+                    searchMangas.value = mtFallback
+                    hasMoreSearch.value = false
+                }
             } finally {
                 isSearching.value = false
             }
@@ -2356,6 +2448,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isSearchingMore.value = true
             try {
+                if (searchSource.value == SearchSource.MANHWATOON || selectedCategory.value == MangaCategory.MANHWATOON) {
+                    val page = (searchMangas.value.size / 10) + 1
+                    val more = com.example.repository.ManhwaToonRepository.searchManga(query, page = page)
+                    if (more.isEmpty()) {
+                        hasMoreSearch.value = false
+                    } else {
+                        val currentList = searchMangas.value.toMutableList()
+                        val existingIds = currentList.map { it.id }.toSet()
+                        val filteredNew = more.filter { !existingIds.contains(it.id) }
+                        currentList.addAll(filteredNew)
+                        searchMangas.value = currentList
+                        hasMoreSearch.value = more.size >= 10
+                    }
+                    return@launch
+                }
+
                 val ratings = getActiveRatings()
                 var finalTitle: String? = null
                 var finalAuthors: List<String>? = null

@@ -54,6 +54,7 @@ import com.example.viewmodel.MainViewModel
 import com.example.viewmodel.MangaCategory
 import com.example.viewmodel.MangaSortOrder
 import com.example.viewmodel.SearchMode
+import com.example.viewmodel.SearchSource
 import kotlinx.coroutines.launch
 
 @Composable
@@ -2300,14 +2301,26 @@ fun SearchScreenContent(
     val searchMangas by viewModel.searchMangas.collectAsState()
     val authorResults by viewModel.authorSearchResults.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
+    val isSearchingMore by viewModel.isSearchingMore.collectAsState()
+    val hasMoreSearch by viewModel.hasMoreSearch.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchMode by viewModel.searchMode.collectAsState()
+    val searchSource by viewModel.searchSource.collectAsState()
     val bookmarkedIds by viewModel.bookmarkedIds.collectAsState()
     val favoriteIds by viewModel.favoriteIds.collectAsState()
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val showScrollToTop by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .collect { lastIndex ->
+                if (lastIndex != null && lastIndex >= searchMangas.size - 4 && hasMoreSearch && !isSearchingMore && !isSearching) {
+                    viewModel.loadMoreSearch()
+                }
+            }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
@@ -2380,6 +2393,36 @@ fun SearchScreenContent(
                 }
             }
 
+            // Source Filter Chips
+            if (searchMode != SearchMode.AUTHOR) {
+                Spacer(modifier = Modifier.height(10.dp))
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(SearchSource.values().toList()) { source ->
+                        val isSelected = searchSource == source
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) ThemePrimary else ThemeSurfaceVariant,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { viewModel.updateSearchSource(source) }
+                                .testTag("search_source_${source.name.lowercase()}")
+                        ) {
+                            Text(
+                                text = source.displayName,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else ThemeOnSurfaceVariant
+                                ),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             if (isSearching) {
@@ -2418,7 +2461,23 @@ fun SearchScreenContent(
                                 modifier = Modifier.fillMaxWidth().padding(32.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("No manga titles found.", color = ThemeOnSurfaceVariant)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = if (searchSource == SearchSource.MANHWATOON) {
+                                            "No ManhwaToon titles found for \"$searchQuery\"."
+                                        } else {
+                                            "No manga titles found."
+                                        },
+                                        color = ThemeOnSurfaceVariant,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    if (searchSource == SearchSource.MANHWATOON) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        TextButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                            Text("Browse All ManhwaToon", color = ThemePrimary)
+                                        }
+                                    }
+                                }
                             }
                         }
                     } else {
@@ -2438,6 +2497,16 @@ fun SearchScreenContent(
                                 },
                                 onQuickPeek = { viewModel.openQuickPeek(manga) }
                             )
+                        }
+                        if (isSearchingMore) {
+                            item {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(28.dp), color = ThemePrimary)
+                                }
+                            }
                         }
                     }
                 }

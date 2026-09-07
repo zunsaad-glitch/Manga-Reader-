@@ -149,12 +149,29 @@ object ManhwaToonRepository {
     }
 
     /**
-     * Live search on manhwatoon.me
+     * Live search on manhwatoon.me with graceful fallback and local matching
      */
     suspend fun searchManga(query: String, page: Int = 1): List<MangaData> = withContext(Dispatchers.IO) {
-        if (query.isBlank()) return@withContext emptyList()
+        val qTrim = query.trim()
+        if (qTrim.isBlank()) return@withContext emptyList()
+
+        val qLower = qTrim.lowercase()
+
+        // If user typed 'manhwatoon' or 'manhwa toon', return full curated catalogue
+        if (qLower == "manhwatoon" || qLower == "manhwa toon" || qLower == "manhwa" || qLower == "webtoon") {
+            val all = (getCuratedSnapshot() + mangaCache.values).distinctBy { it.id }
+            return@withContext all
+        }
+
+        val localMatches = (getCuratedSnapshot() + mangaCache.values).distinctBy { it.id }.filter { m ->
+            val title = m.attributes?.title?.values?.firstOrNull()?.lowercase().orEmpty()
+            val desc = m.attributes?.description?.values?.firstOrNull()?.lowercase().orEmpty()
+            val tags = m.attributes?.tags?.mapNotNull { it.attributes?.name?.values?.firstOrNull()?.lowercase() }.orEmpty()
+            title.contains(qLower) || desc.contains(qLower) || tags.any { it.contains(qLower) }
+        }
+
         try {
-            val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8")
+            val encodedQuery = URLEncoder.encode(qTrim, "UTF-8")
             val url = if (page > 1) {
                 "$BASE_URL/page/$page/?s=$encodedQuery&post_type=wp-manga"
             } else {
@@ -170,16 +187,26 @@ object ManhwaToonRepository {
                 .build()
 
             val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) return@withContext emptyList()
+            val results = if (response.isSuccessful) {
+                val html = response.body?.string().orEmpty()
+                val doc = Jsoup.parse(html, BASE_URL)
+                parseMangaCards(doc)
+            } else {
+                emptyList()
+            }
 
-            val html = response.body?.string().orEmpty()
-            val doc = Jsoup.parse(html, BASE_URL)
-            val results = parseMangaCards(doc)
             results.forEach { mangaCache[it.id] = it }
-            results
+
+            // Combine live results with local curated matches (no duplicates)
+            val combined = (results + (if (page == 1) localMatches else emptyList())).distinctBy { it.id }
+            if (combined.isNotEmpty()) {
+                combined
+            } else {
+                localMatches
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error searching ManhwaToon for $query", e)
-            emptyList()
+            localMatches
         }
     }
 
@@ -526,18 +553,18 @@ object ManhwaToonRepository {
         val results = mutableListOf<MangaData>()
         val seenSlugs = mutableSetOf<String>()
 
-        // Look for cards: select individual card items, NOT parent row containers
-        val cardElements = doc.select(".page-item-detail, .c-tabs-item__content .col-6, .c-tabs-item__content .page-item-detail, .search-wrap .c-tabs-item__content .row > div")
+        // Look for cards: matches search result rows (.row.c-tabs-item__content) and directory cards (.page-item-detail)
+        val cardElements = doc.select(".row.c-tabs-item__content, .page-item-detail, .search-wrap .row.c-tabs-item__content, .tab-content-wrap .row")
 
         for (el in cardElements) {
-            // Priority: title link inside .post-title or h3 or h5
-            val titleEl = el.selectFirst(".post-title a, .post-title h3 a, .post-title h5 a, h3.h5 a, h3 a, h5 a, .widget-title a")
-            val thumbLink = el.selectFirst(".item-thumb a, .tab-thumb a, .related-reading-img a, .c-image-hover a")
+            // Priority: title link inside .post-title or h3, h4, h5
+            val titleEl = el.selectFirst(".post-title a, .post-title h3 a, .post-title h4 a, .post-title h5 a, h3.h4 a, h4.h4 a, h3 a, h4 a, h5 a, .widget-title a")
+            val thumbLink = el.selectFirst(".tab-thumb a, .item-thumb a, .related-reading-img a, .c-image-hover a")
 
             val href = titleEl?.attr("abs:href")?.trim().orEmpty().ifEmpty {
                 thumbLink?.attr("abs:href")?.trim().orEmpty()
             }
-            if (!href.contains("/manhwa/")) continue
+            if (!href.contains("/manhwa/") || href.contains("/feed") || href.contains("/chapter-")) continue
 
             val slug = extractSlug(href)
             if (slug.isEmpty() || !seenSlugs.add(slug)) continue
@@ -565,11 +592,17 @@ object ManhwaToonRepository {
                 "https://cdn.manhwatoon.me/$slug.webp"
             }
 
-            val latestCh = el.select(".chapter-item a, .list-chapter a").firstOrNull()?.text()?.trim()
+            val latestCh = el.select(".meta-item.latest-chap a, .chapter-item a, .list-chapter a").firstOrNull()?.text()?.trim()
             val desc = if (!latestCh.isNullOrEmpty()) "Latest: $latestCh" else "Korean Manhwa & Webtoon"
 
+            val author = el.select(".mg_author .summary-content a, .author-content a, .post-content_item:contains(Author) a").firstOrNull()?.text()?.trim().orEmpty().ifEmpty { "ManhwaToon" }
+
             // Extract tags for card
-            val cardGenres = el.select(".genres-content a").map { it.text().trim() }.filter { it.isNotBlank() }.toMutableList()
+            val cardGenres = el.select(".genres-content a, .mg_genres .summary-content a, .item-tags a, a[href*='manhwa-genre']")
+                .map { it.text().trim().trim(',', ' ') }
+                .filter { it.isNotBlank() }
+                .toMutableList()
+
             if (cardGenres.isEmpty()) {
                 cardGenres.add("Manhwa")
                 cardGenres.add("Webtoon")
@@ -606,7 +639,7 @@ object ManhwaToonRepository {
                         Relationship(
                             id = "author_$slug",
                             type = "author",
-                            attributes = RelationshipAttributes(name = "ManhwaToon")
+                            attributes = RelationshipAttributes(name = author)
                         )
                     )
                 )
