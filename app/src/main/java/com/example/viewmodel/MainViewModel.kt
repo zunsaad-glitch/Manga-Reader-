@@ -821,7 +821,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectCategory(category: MangaCategory) {
         selectedCategory.value = category
-        fetchMangas()
+        if (category == MangaCategory.COMIC_3D) {
+            val list = if (threeDComicsList.value.isNotEmpty()) {
+                threeDComicsList.value
+            } else {
+                val curated = com.example.repository.ThreeDComicsRepository.getAll3DComics()
+                threeDComicsList.value = curated
+                fetchThreeDComics()
+                curated
+            }
+            mangas.value = list
+            isLoading.value = false
+            hasMoreHome.value = false
+        } else {
+            fetchMangas()
+        }
         if (searchQuery.value.isNotBlank() || searchMode.value != SearchMode.TITLE) {
             performSearch()
         }
@@ -994,6 +1008,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 for (m in curated3d) {
                     if (existingIds.add(m.id)) combined.add(m)
                 }
+                threeDComicsList.value = combined.toList()
+                if (selectedCategory.value == MangaCategory.COMIC_3D) {
+                    mangas.value = combined.toList()
+                }
 
                 // Query live 3D & CG titles from nHentai v2 API
                 try {
@@ -1046,7 +1064,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } catch (_: Exception) {}
 
-                threeDComicsList.value = combined
+                threeDComicsList.value = combined.toList()
+                if (selectedCategory.value == MangaCategory.COMIC_3D) {
+                    mangas.value = combined.toList()
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1925,6 +1946,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
+                if (selectedCategory.value == MangaCategory.COMIC_3D) {
+                    val list = if (threeDComicsList.value.isNotEmpty()) {
+                        threeDComicsList.value
+                    } else {
+                        val curated = com.example.repository.ThreeDComicsRepository.getAll3DComics()
+                        threeDComicsList.value = curated
+                        fetchThreeDComics()
+                        curated
+                    }
+                    mangas.value = list
+                    isLoading.value = false
+                    hasMoreHome.value = false
+                    return@launch
+                }
+
                 val is3d = selectedCategory.value == MangaCategory.COMIC_3D || selectedTag.value.contains("3D", ignoreCase = true)
                 val isEcchi = selectedCategory.value == MangaCategory.ECCHI || selectedTag.value.equals("Ecchi", ignoreCase = true) || selectedTag.value.equals("Smut", ignoreCase = true)
 
@@ -2017,6 +2053,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             if (selectedCategory.value == MangaCategory.MANHWATOON) {
                 loadMoreManhwaToon()
+                return@launch
+            }
+
+            if (selectedCategory.value == MangaCategory.COMIC_3D) {
+                hasMoreHome.value = false
                 return@launch
             }
 
@@ -2441,6 +2482,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 similarMangas.value = emptyList()
                 return@launch
             }
+
+            // 1. ManhwaToon titles: use scraped 'YOU MAY ALSO LIKE' related recommendations
+            if (com.example.repository.ManhwaToonRepository.isManhwaToonId(manga.id)) {
+                val scrapedRelated = com.example.repository.ManhwaToonRepository.getRelatedMangas(manga.id)
+                if (scrapedRelated.isNotEmpty()) {
+                    similarMangas.value = scrapedRelated
+                    return@launch
+                }
+                val allMt = manhwaToonList.value.ifEmpty { com.example.repository.ManhwaToonRepository.getCuratedSnapshot() }
+                val fallback = allMt.filter { it.id != manga.id }.shuffled().take(8)
+                similarMangas.value = fallback
+                return@launch
+            }
+
+            // 2. 3D Comics & CG Vault: recommend other 3D graphic novels
+            if (manga.id.startsWith("3d_") || manga.id.startsWith("curated_3d")) {
+                val all3d = threeDComicsList.value.ifEmpty { com.example.repository.ThreeDComicsRepository.getAll3DComics() }
+                val fallback = all3d.filter { it.id != manga.id }.shuffled().take(8)
+                similarMangas.value = fallback
+                return@launch
+            }
+
+            // 3. MangaDex
             try {
                 val tags = manga.attributes?.tags?.mapNotNull { it.id }?.take(3)
                 if (tags.isNullOrEmpty()) {

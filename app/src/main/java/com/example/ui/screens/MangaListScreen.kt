@@ -851,17 +851,19 @@ fun HomeScreenContent(
                             }
                         }
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Utility and Feature Pills Bar
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+            // Utility and Feature Pills Bar
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                         Surface(
                             shape = RoundedCornerShape(50),
                             color = Color(0xFF00E5FF).copy(alpha = 0.12f),
@@ -982,7 +984,6 @@ fun HomeScreenContent(
                             }
                         }
                     }
-                }
             }
 
             // Streamlined Category & Quick Navigation Bar with Content Numbers
@@ -1081,7 +1082,10 @@ fun HomeScreenContent(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Surface(
                                         shape = CircleShape,
                                         color = Color(0xFF9C27B0).copy(alpha = 0.25f),
@@ -1092,19 +1096,23 @@ fun HomeScreenContent(
                                         }
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f, fill = false)) {
                                         Text(
                                             "ManhwaToon.me Scraper",
                                             style = MaterialTheme.typography.titleMedium.copy(
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFFF3E5F5)
-                                            )
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
                                             "Live direct HTML scraper from manhwatoon.me",
                                             style = MaterialTheme.typography.bodySmall.copy(
                                                 color = Color(0xFFCE93D8)
-                                            )
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }
@@ -1115,9 +1123,12 @@ fun HomeScreenContent(
                                 ) {
                                     Text(
                                         if (isManhwaToonLoading) "SCRAPING..." else "LIVE CONNECTED",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        maxLines = 1,
+                                        softWrap = false,
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 10.sp,
                                             color = if (isManhwaToonLoading) Color(0xFFFFB74D) else Color(0xFF81C784)
                                         )
                                     )
@@ -1228,8 +1239,8 @@ fun HomeScreenContent(
                 }
             }
 
-            // Normal carousels are shown when NOT in dedicated ManhwaToon tab
-            if (selectedCategory != MangaCategory.MANHWATOON) {
+            // Discovery Carousels are exclusively shown on the ALL Home page
+            if (selectedCategory == MangaCategory.ALL) {
                 // Slide of Fresh Releases on top (excluding completed mangas)
                 if (freshMangas.isNotEmpty()) {
                     item {
@@ -1248,7 +1259,6 @@ fun HomeScreenContent(
                         }
                     }
                 }
-            }
 
         // Greatest of All Time (GOAT) Masterpieces Carousel
         if (goatMangas.isNotEmpty()) {
@@ -1483,6 +1493,7 @@ fun HomeScreenContent(
                 }
             }
         }
+        }
 
         // All Manga Feed
         val displayMangas = if (selectedCategory == MangaCategory.MANHWATOON && manhwaToonList.isNotEmpty()) manhwaToonList else mangas
@@ -1490,7 +1501,7 @@ fun HomeScreenContent(
 
         item {
             SectionHeader(
-                title = if (selectedCategory == MangaCategory.MANHWATOON) "⚡ ManhwaToon Directory" else "📚 Explore ${selectedCategory.displayName} Directory",
+                title = if (selectedCategory == MangaCategory.MANHWATOON) "⚡ ManhwaToon Directory" else if (selectedCategory == MangaCategory.COMIC_3D) "🧊 3D Comics & CG Vault" else "📚 Explore ${selectedCategory.displayName} Directory",
                 subtitle = if (selectedCategory == MangaCategory.MANHWATOON) "${displayMangas.size} titles scraped live" else "${displayMangas.size} titles loaded"
             )
         }
@@ -2202,6 +2213,33 @@ fun MangaFeedCard(
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White
+                                    )
+                                )
+                            }
+                        }
+
+                        val displayTags = manga.attributes?.tags?.mapNotNull {
+                            it.attributes?.name?.get("en") ?: it.attributes?.name?.values?.firstOrNull()
+                        }?.filter {
+                            !it.equals("Manhwa", true) &&
+                            !it.equals("Webtoon", true) &&
+                            !it.equals("Full Color", true) &&
+                            !it.equals("Official Colored", true)
+                        }?.take(2) ?: emptyList()
+
+                        displayTags.forEach { tagName ->
+                            val isMatureTag = tagName.contains("18+") || tagName.contains("Erotica") || tagName.contains("Adult")
+                            Surface(
+                                color = if (isMatureTag) Color(0xFFD32F2F).copy(alpha = 0.2f) else ThemeSurfaceVariant,
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = tagName,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isMatureTag) Color(0xFFFF8A80) else ThemeOnSurfaceVariant
                                     )
                                 )
                             }

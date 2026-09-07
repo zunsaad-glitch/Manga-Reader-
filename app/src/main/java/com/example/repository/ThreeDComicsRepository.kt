@@ -6,6 +6,8 @@ import com.example.api.MangaAttributes
 import com.example.api.MangaData
 import com.example.api.Relationship
 import com.example.api.RelationshipAttributes
+import com.example.api.TagAttributes
+import com.example.api.TagData
 
 data class ThreeDChapter(
     val chapterId: String,
@@ -23,11 +25,13 @@ data class ThreeDManga(
     val author: String,
     val description: String,
     val contentRating: String,
-    val chapters: List<ThreeDChapter>
+    val chapters: List<ThreeDChapter>,
+    val explicitCoverUrl: String? = null
 ) {
     val coverUrl: String
         get() {
-            val firstMediaId = chapters.firstOrNull()?.mediaId ?: "2279150"
+            if (!explicitCoverUrl.isNullOrBlank()) return explicitCoverUrl
+            val firstMediaId = chapters.firstOrNull()?.mediaId ?: "3031776"
             return "https://t.nhentai.net/galleries/$firstMediaId/thumb.jpg"
         }
 }
@@ -41,6 +45,7 @@ object ThreeDComicsRepository {
             author = "Studio FOW",
             description = "High-end 3D rendered ninja espionage action comic in cinematic full color. Follow the shadow operative through stealth missions and clan trials.",
             contentRating = "pornographic",
+            explicitCoverUrl = "https://t.nhentai.net/galleries/2279150/thumb.jpg.webp",
             chapters = listOf(
                 ThreeDChapter(
                     chapterId = "3d_kunoichi_ch1",
@@ -95,6 +100,7 @@ object ThreeDComicsRepository {
             author = "3D Fantasy Renders",
             description = "Survival horror 3D graphic novel featuring Claire Redfield and Jill Valentine escaping Raccoon City's underground outbreak.",
             contentRating = "pornographic",
+            explicitCoverUrl = "https://t.nhentai.net/galleries/3031776/thumb.jpg",
             chapters = listOf(
                 ThreeDChapter(
                     chapterId = "3d_re_claire_ch1",
@@ -149,6 +155,7 @@ object ThreeDComicsRepository {
             author = "Project 3D",
             description = "Photorealistic 3D graphic comic set in neon-drenched Night City. High-stakes cyberware contracts and netrunner intrigue.",
             contentRating = "erotica",
+            explicitCoverUrl = "https://t.nhentai.net/galleries/1748231/thumb.jpg.webp",
             chapters = listOf(
                 ThreeDChapter(
                     chapterId = "3d_cyberpunk_ch1",
@@ -203,6 +210,7 @@ object ThreeDComicsRepository {
             author = "Cherry Bomb 3D",
             description = "Stunning 3D CG comic capturing Sector 7 Seventh Heaven nightlife and Cloud's companion adventures.",
             contentRating = "pornographic",
+            explicitCoverUrl = "https://t.nhentai.net/galleries/1954643/thumb.jpg",
             chapters = listOf(
                 ThreeDChapter(
                     chapterId = "3d_tifa_ff7_ch1",
@@ -257,6 +265,7 @@ object ThreeDComicsRepository {
             author = "MilfToon Renders",
             description = "Classic Western 3D graphic novel series exploring neighborhood intrigue, poolside parties, and private drama.",
             contentRating = "pornographic",
+            explicitCoverUrl = "https://t.nhentai.net/galleries/2019715/thumb.jpg.webp",
             chapters = listOf(
                 ThreeDChapter(
                     chapterId = "3d_milftoon_suburban_ch1",
@@ -311,6 +320,7 @@ object ThreeDComicsRepository {
             author = "Studio Lust",
             description = "Full-color 3D graphic webtoon following luxury penthouse romance, high society parties, and midnight secrets.",
             contentRating = "pornographic",
+            explicitCoverUrl = "https://t.nhentai.net/galleries/2999240/thumb.jpg",
             chapters = listOf(
                 ThreeDChapter(
                     chapterId = "3d_sinful_dreams_ch1",
@@ -365,6 +375,7 @@ object ThreeDComicsRepository {
             author = "RedGrave 3D",
             description = "Dark fantasy 3D graphic novel featuring monster hunters, enchanted castles, and ancient covenants.",
             contentRating = "erotica",
+            explicitCoverUrl = "https://t.nhentai.net/galleries/2949057/thumb.jpg",
             chapters = listOf(
                 ThreeDChapter(
                     chapterId = "3d_witch_hunter_ch1",
@@ -419,6 +430,7 @@ object ThreeDComicsRepository {
             author = "CG Heroes",
             description = "Superheroine comic rendered in high-definition 3D CG modeling. Watch the cousins patrol Metropolis and team up against villains.",
             contentRating = "pornographic",
+            explicitCoverUrl = "https://t.nhentai.net/galleries/1783739/thumb.jpg",
             chapters = listOf(
                 ThreeDChapter(
                     chapterId = "3d_supergirl_ch1",
@@ -910,7 +922,13 @@ object ThreeDComicsRepository {
                     description = mapOf("en" to m.description),
                     originalLanguage = "en",
                     contentRating = m.contentRating,
-                    status = "completed"
+                    status = "completed",
+                    tags = listOf(
+                        TagData(id = "3d", attributes = TagAttributes(name = mapOf("en" to "3D"))),
+                        TagData(id = "3dcg", attributes = TagAttributes(name = mapOf("en" to "3DCG"))),
+                        TagData(id = "full-color", attributes = TagAttributes(name = mapOf("en" to "Full Color"))),
+                        TagData(id = "graphic-novel", attributes = TagAttributes(name = mapOf("en" to "Graphic Novel")))
+                    )
                 ),
                 relationships = listOf(
                     Relationship(

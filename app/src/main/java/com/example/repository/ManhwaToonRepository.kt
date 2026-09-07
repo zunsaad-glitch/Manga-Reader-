@@ -7,6 +7,8 @@ import com.example.api.MangaAttributes
 import com.example.api.MangaData
 import com.example.api.Relationship
 import com.example.api.RelationshipAttributes
+import com.example.api.TagAttributes
+import com.example.api.TagData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -37,6 +39,7 @@ object ManhwaToonRepository {
     private val mangaCache = ConcurrentHashMap<String, MangaData>()
     private val chapterCache = ConcurrentHashMap<String, List<ChapterData>>()
     private val pagesCache = ConcurrentHashMap<String, List<String>>()
+    private val relatedCache = ConcurrentHashMap<String, List<MangaData>>()
 
     fun isManhwaToonId(id: String): Boolean {
         return id.startsWith("mt_") || id.contains("manhwatoon.me")
@@ -44,6 +47,33 @@ object ManhwaToonRepository {
 
     fun isManhwaToonChapterId(chapterId: String): Boolean {
         return chapterId.startsWith("mt_") && chapterId.contains("_ch_")
+    }
+
+    fun getRelatedMangas(mangaIdOrSlug: String): List<MangaData> {
+        val slug = extractSlug(mangaIdOrSlug)
+        return relatedCache[slug] ?: relatedCache[mangaIdOrSlug] ?: emptyList()
+    }
+
+    fun isBadgeOnly(t: String): Boolean {
+        val trimmed = t.trim()
+        if (trimmed.isEmpty()) return true
+        val clean = trimmed.replace(Regex("""^(?:18\+\s*|HOT\s*|RAW\s*|NEW\s*|ADULT\s*)+""", RegexOption.IGNORE_CASE), "").trim()
+        return clean.isEmpty() ||
+                trimmed.equals("18+", ignoreCase = true) ||
+                trimmed.equals("HOT", ignoreCase = true) ||
+                trimmed.equals("18+HOT", ignoreCase = true) ||
+                trimmed.equals("HOT18+", ignoreCase = true) ||
+                trimmed.equals("RAW", ignoreCase = true) ||
+                trimmed.equals("NEW", ignoreCase = true) ||
+                trimmed.equals("ADULT", ignoreCase = true)
+    }
+
+    fun cleanTitle(raw: String): String {
+        return raw
+            .replace(Regex("""<[^>]+>"""), " ")
+            .replace(Regex("""^(?:18\+\s*|HOT\s*|RAW\s*|NEW\s*|ADULT\s*)+""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""\s*(?:-\s*ManhwaToon|-\s*Manhwa Toon)\s*$""", RegexOption.IGNORE_CASE), "")
+            .trim()
     }
 
     fun extractSlug(idOrUrl: String): String {
@@ -181,19 +211,117 @@ object ManhwaToonRepository {
             val html = response.body?.string().orEmpty()
             val doc = Jsoup.parse(html, BASE_URL)
 
-            val title = doc.select(".post-title h1").text().trim().ifEmpty {
-                doc.select("meta[property=og:title]").attr("content").removeSuffix(" - ManhwaToon").trim()
-            }.ifEmpty { slug.replace("-", " ").capitalizeWords() }
+            // Strip badge elements inside title headers to avoid picking up 18+/HOT badges
+            doc.select(".post-title h1 .manga-title-badges, .post-title h1 .badge, .post-title .badge, .post-title .manga-title-badges").remove()
 
-            val coverUrl = doc.select("meta[property=og:image]").attr("content").trim().ifEmpty {
-                extractImageSrc(doc.selectFirst(".summary_image img"))
+            var title = doc.select(".post-title h1, .post-title h3, h1.entry-title, h1").firstOrNull()?.text()?.trim().orEmpty()
+            title = cleanTitle(title)
+            if (title.isEmpty() || isBadgeOnly(title)) {
+                val ogTitle = doc.select("meta[property=og:title]").attr("content").trim()
+                title = cleanTitle(ogTitle)
+            }
+            if (title.isEmpty() || isBadgeOnly(title)) {
+                val twitterTitle = doc.select("meta[name=twitter:title]").attr("content").trim()
+                title = cleanTitle(twitterTitle)
+            }
+            if (title.isEmpty() || isBadgeOnly(title)) {
+                title = slug.replace("-", " ").capitalizeWords()
             }
 
-            val desc = doc.select(".summary__content, .description-summary, .manga-excerpt").text().trim()
-            val author = doc.select(".author-content a, .artist-content a").text().trim().ifEmpty { "ManhwaToon Artist" }
-            val genres = doc.select(".genres-content a").map { it.text().trim() }
-            val statusText = doc.select(".post-status .summary-content").text().trim().lowercase()
+            val coverUrl = doc.select("meta[property=og:image]").attr("content").trim().ifEmpty {
+                doc.select("meta[name=twitter:image]").attr("content").trim()
+            }.ifEmpty {
+                extractImageSrc(doc.selectFirst(".summary_image img, .tab-summary img"))
+            }.ifEmpty {
+                "https://cdn.manhwatoon.me/$slug.webp"
+            }
+
+            // Extract full synopsis and clean off 'Show more' / 'Show less'
+            var desc = doc.select(".summary__content p, .summary__content, .description-summary, .manga-excerpt").text().trim()
+            desc = desc.replace(Regex("""\s*(?:Show more|Show less|Read more|Read less)\s*$""", RegexOption.IGNORE_CASE), "").trim()
+
+            if (desc.isEmpty()) {
+                desc = doc.select("meta[property=og:description]").attr("content").trim()
+                    .replace(Regex("""\s*(?:Show more|Show less|Read more|Read less)\s*$""", RegexOption.IGNORE_CASE), "").trim()
+            }
+            if (desc.isEmpty()) {
+                desc = doc.select("meta[name=description]").attr("content").trim()
+                    .replace(Regex("""\s*(?:Show more|Show less|Read more|Read less)\s*$""", RegexOption.IGNORE_CASE), "").trim()
+            }
+            if (desc.isEmpty()) {
+                desc = "Read $title online free on ManhwaToon. Enjoy all latest chapters in high resolution full color."
+            }
+
+            val author = doc.select(".author-content a, .artist-content a, .post-content_item:contains(Author) a").text().trim().ifEmpty { "ManhwaToon Artist" }
+
+            // Extract genres and convert to TagData
+            val genres = doc.select(".genres-content a, .item-tags a, .manga-tags a, a[href*='manhwa-genre']")
+                .map { it.text().trim().trim(',', ' ') }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .toMutableList()
+
+            if (genres.isEmpty()) {
+                genres.addAll(listOf("Manhwa", "Webtoon", "Full Color", "Drama", "Romance"))
+            }
+
+            val tagDataList = genres.map { genreName ->
+                TagData(
+                    id = genreName.lowercase().replace(" ", "-"),
+                    attributes = TagAttributes(name = mapOf("en" to genreName))
+                )
+            }
+
+            val statusText = doc.select(".post-status .summary-content, .post-content_item:contains(Status) .summary-content").text().trim().lowercase()
             val status = if (statusText.contains("complete")) "completed" else "ongoing"
+
+            // Scrape Similar / Related Manga suggestions from 'YOU MAY ALSO LIKE' (.related-manga)
+            val relatedList = mutableListOf<MangaData>()
+            val seenRelatedSlugs = mutableSetOf<String>()
+            val relatedElements = doc.select(".related-manga .related-reading-wrap, .related-manga .col-12, .related-manga .col-md-3, .related-manga .widget-content")
+
+            for (relEl in relatedElements) {
+                val relLink = relEl.selectFirst(".widget-title a, a[title], h5 a") ?: continue
+                val relHref = relLink.attr("abs:href").trim()
+                if (!relHref.contains("/manhwa/")) continue
+                val relSlug = extractSlug(relHref)
+                if (relSlug.isEmpty() || relSlug == slug || !seenRelatedSlugs.add(relSlug)) continue
+
+                var relTitle = relLink.text().trim().ifEmpty { relLink.attr("title").trim() }
+                relTitle = cleanTitle(relTitle)
+                if (relTitle.isEmpty() || isBadgeOnly(relTitle)) {
+                    relTitle = relSlug.replace("-", " ").capitalizeWords()
+                }
+
+                val relImg = relEl.selectFirst("img")
+                val relCover = extractImageSrc(relImg).ifEmpty { "https://cdn.manhwatoon.me/$relSlug.webp" }
+
+                relatedList.add(
+                    MangaData(
+                        id = "mt_$relSlug",
+                        attributes = MangaAttributes(
+                            title = mapOf("en" to relTitle),
+                            description = mapOf("en" to "Read $relTitle online free on ManhwaToon."),
+                            originalLanguage = "ko",
+                            contentRating = "suggestive",
+                            status = "ongoing",
+                            tags = listOf(
+                                TagData(id = "manhwa", attributes = TagAttributes(name = mapOf("en" to "Manhwa"))),
+                                TagData(id = "webtoon", attributes = TagAttributes(name = mapOf("en" to "Webtoon")))
+                            )
+                        ),
+                        relationships = listOf(
+                            Relationship(id = "mt_$relSlug", type = "cover_art", attributes = RelationshipAttributes(fileName = relCover)),
+                            Relationship(id = "author_$relSlug", type = "author", attributes = RelationshipAttributes(name = "ManhwaToon"))
+                        )
+                    )
+                )
+            }
+
+            if (relatedList.isNotEmpty()) {
+                relatedCache[slug] = relatedList
+                relatedCache[mangaId] = relatedList
+            }
 
             val manga = MangaData(
                 id = mangaId,
@@ -202,7 +330,8 @@ object ManhwaToonRepository {
                     description = mapOf("en" to desc),
                     originalLanguage = "ko",
                     contentRating = if (genres.any { it.contains("Adult", true) || it.contains("Mature", true) }) "pornographic" else "suggestive",
-                    status = status
+                    status = status,
+                    tags = tagDataList
                 ),
                 relationships = listOfNotNull(
                     Relationship(
@@ -397,31 +526,64 @@ object ManhwaToonRepository {
         val results = mutableListOf<MangaData>()
         val seenSlugs = mutableSetOf<String>()
 
-        // Look for cards: .page-item-detail, .c-tabs-item__content, .item-thumb
-        val cardElements = doc.select(".page-item-detail, .c-tabs-item__content, .row.c-tabs-item__content, .col-6.col-md-3, .col-6.col-md-2")
+        // Look for cards: select individual card items, NOT parent row containers
+        val cardElements = doc.select(".page-item-detail, .c-tabs-item__content .col-6, .c-tabs-item__content .page-item-detail, .search-wrap .c-tabs-item__content .row > div")
 
         for (el in cardElements) {
-            val aTag = el.selectFirst("h3 a, .post-title a, .tab-thumb a, .item-thumb a") ?: continue
-            val href = aTag.attr("abs:href").trim()
+            // Priority: title link inside .post-title or h3 or h5
+            val titleEl = el.selectFirst(".post-title a, .post-title h3 a, .post-title h5 a, h3.h5 a, h3 a, h5 a, .widget-title a")
+            val thumbLink = el.selectFirst(".item-thumb a, .tab-thumb a, .related-reading-img a, .c-image-hover a")
+
+            val href = titleEl?.attr("abs:href")?.trim().orEmpty().ifEmpty {
+                thumbLink?.attr("abs:href")?.trim().orEmpty()
+            }
             if (!href.contains("/manhwa/")) continue
 
             val slug = extractSlug(href)
             if (slug.isEmpty() || !seenSlugs.add(slug)) continue
 
-            val title = aTag.text().trim().ifEmpty {
-                aTag.attr("title").trim()
-            }.ifEmpty {
-                el.selectFirst(".post-title")?.text()?.trim().orEmpty()
-            }.ifEmpty { slug.replace("-", " ").capitalizeWords() }
+            // Determine actual title:
+            var title = titleEl?.text()?.trim().orEmpty()
+
+            if (title.isEmpty() || isBadgeOnly(title)) {
+                val attrTitle = thumbLink?.attr("title")?.trim().orEmpty().ifEmpty {
+                    titleEl?.attr("title")?.trim().orEmpty()
+                }
+                if (attrTitle.isNotEmpty() && !isBadgeOnly(attrTitle)) {
+                    title = attrTitle
+                }
+            }
+
+            title = cleanTitle(title)
+
+            if (title.isEmpty() || isBadgeOnly(title)) {
+                title = slug.replace("-", " ").capitalizeWords()
+            }
 
             val imgEl = el.selectFirst("img")
             val coverUrl = extractImageSrc(imgEl).ifEmpty {
                 "https://cdn.manhwatoon.me/$slug.webp"
             }
 
-            val rating = el.select(".score, .total_votes").text().trim()
             val latestCh = el.select(".chapter-item a, .list-chapter a").firstOrNull()?.text()?.trim()
             val desc = if (!latestCh.isNullOrEmpty()) "Latest: $latestCh" else "Korean Manhwa & Webtoon"
+
+            // Extract tags for card
+            val cardGenres = el.select(".genres-content a").map { it.text().trim() }.filter { it.isNotBlank() }.toMutableList()
+            if (cardGenres.isEmpty()) {
+                cardGenres.add("Manhwa")
+                cardGenres.add("Webtoon")
+                if (title.contains("Raw", ignoreCase = true)) cardGenres.add("Raw")
+                if (title.contains("Uncensored", ignoreCase = true)) cardGenres.add("Uncensored")
+                if (el.select(".manga-title-badges, .adult").text().contains("18+")) cardGenres.add("Adult")
+            }
+            val cardTags = cardGenres.distinct().map { g ->
+                TagData(id = g.lowercase().replace(" ", "-"), attributes = TagAttributes(name = mapOf("en" to g)))
+            }
+
+            val isAdult = cardGenres.any { it.contains("Adult", true) || it.contains("Mature", true) } ||
+                    el.select(".manga-title-badges, .adult").text().contains("18+") ||
+                    title.contains("Uncensored", true)
 
             val mangaId = "mt_$slug"
             results.add(
@@ -431,8 +593,9 @@ object ManhwaToonRepository {
                         title = mapOf("en" to title),
                         description = mapOf("en" to desc),
                         originalLanguage = "ko",
-                        contentRating = "suggestive",
-                        status = "ongoing"
+                        contentRating = if (isAdult) "pornographic" else "suggestive",
+                        status = "ongoing",
+                        tags = cardTags
                     ),
                     relationships = listOf(
                         Relationship(
@@ -462,42 +625,139 @@ object ManhwaToonRepository {
      * Curated snapshot of popular manhwas on ManhwaToon for instant zero-latency preview
      */
     fun getCuratedSnapshot(): List<MangaData> {
-        val curated = listOf(
-            Triple("a-savage-proposal", "A Savage Proposal", "https://cdn.manhwatoon.me/a-savage-proposal-38187.webp"),
-            Triple("excuse-me-this-is-my-room-uncensored", "Excuse Me, This Is My Room [Uncensored]", "https://cdn.manhwatoon.me/WP-manga/data/manga_6a378323a0a6f/cover.webp"),
-            Triple("theres-no-such-thing-as-a-bad-hero-in-the-world", "There’s No Such Thing As A Bad Hero In The World", "https://cdn.manhwatoon.me/theres-no-such-thing-as-a-bad-hero-in-the-world-15874.webp"),
-            Triple("freelancer", "Freelancer", "https://cdn.manhwatoon.me/freelancer-36946.webp"),
-            Triple("beautiful-days-raw", "Beautiful Days [Full Color]", "https://cdn.manhwatoon.me/beautiful-days-raw-29753.webp"),
-            Triple("beware-of-the-villainess-manhwa", "Beware of the Villainess! Manhwa", "https://cdn.manhwatoon.me/beware-of-the-villainess-manhwa-37012.webp"),
-            Triple("the-dead-queens-second-life", "The Dead Queen’s Second Life", "https://cdn.manhwatoon.me/the-dead-queens-second-life-38150.webp"),
-            Triple("the-wind-mage", "The Wind Mage", "https://cdn.manhwatoon.me/the-wind-mage-37880.webp"),
-            Triple("the-youngest-daughter-of-the-sichuan-tang-family-was-kidnapped", "The Youngest Daughter of the Sichuan Tang Family Was Kidnapped", "https://cdn.manhwatoon.me/the-youngest-daughter-of-the-sichuan-tang-family-was-kidnapped-38165.webp"),
-            Triple("where-did-all-the-men-go", "Where Did All the Men Go?", "https://cdn.manhwatoon.me/where-did-all-the-men-go-38012.webp"),
-            Triple("mesmerizing-ghost-doctor", "Mesmerizing Ghost Doctor", "https://cdn.manhwatoon.me/mesmerizing-ghost-doctor-36890.webp"),
-            Triple("get-out", "Get Out!", "https://cdn.manhwatoon.me/get-out-37540.webp"),
-            Triple("hooked-on-you", "Hooked On You", "https://cdn.manhwatoon.me/hooked-on-you-37620.webp"),
-            Triple("i-owe-a-billion-dollars-and-i-am-forced-to-become-a-worker-for-an-evil-god", "I Owe A Billion Dollars And I Am Forced to Become A Worker For An Evil God", "https://cdn.manhwatoon.me/i-owe-a-billion-dollars-and-i-am-forced-to-become-a-worker-for-an-evil-god-37910.webp")
+        data class CuratedItem(
+            val slug: String,
+            val title: String,
+            val cover: String,
+            val synopsis: String,
+            val tags: List<String>,
+            val isAdult: Boolean = true
         )
 
-        return curated.map { (slug, title, cover) ->
-            val mangaId = "mt_$slug"
+        val curated = listOf(
+            CuratedItem(
+                "a-savage-proposal",
+                "A Savage Proposal",
+                "https://cdn.manhwatoon.me/a-savage-proposal-38187.webp",
+                "A strategic contract marriage turns into an intense game of dominance, corporate rivalries, and irresistible passion.",
+                listOf("Romance", "Drama", "Manhwa", "Webtoon")
+            ),
+            CuratedItem(
+                "excuse-me-this-is-my-room-uncensored",
+                "Excuse Me, This Is My Room [Uncensored]",
+                "https://cdn.manhwatoon.me/WP-manga/data/manga_6a378323a0a6f/cover.webp",
+                "An accidental roommate arrangement leads to unexpected midnight encounters and spicy romance behind closed doors.",
+                listOf("Adult", "Romance", "Ecchi", "Uncensored", "Manhwa")
+            ),
+            CuratedItem(
+                "theres-no-such-thing-as-a-bad-hero-in-the-world",
+                "There’s No Such Thing As A Bad Hero In The World",
+                "https://cdn.manhwatoon.me/theres-no-such-thing-as-a-bad-hero-in-the-world-15874.webp",
+                "Awakened in an unjust society of corrupt superhumans, one antihero decides to bring retribution on his own terms.",
+                listOf("Action", "Fantasy", "Supernatural", "Manhwa")
+            ),
+            CuratedItem(
+                "freelancer",
+                "Freelancer",
+                "https://cdn.manhwatoon.me/freelancer-36946.webp",
+                "A covert underground contractor takes on perilous freelance assignments that push his combat limits to the edge.",
+                listOf("Action", "Drama", "Mystery", "Manhwa")
+            ),
+            CuratedItem(
+                "beautiful-days-raw",
+                "Beautiful Days [Full Color]",
+                "https://cdn.manhwatoon.me/beautiful-days-raw-29753.webp",
+                "Reconnecting after years apart, a passionate and complicated romance blooms between two adults navigating modern city life.",
+                listOf("Romance", "Drama", "Full Color", "Slice of Life", "Manhwa")
+            ),
+            CuratedItem(
+                "beware-of-the-villainess-manhwa",
+                "Beware of the Villainess! Manhwa",
+                "https://cdn.manhwatoon.me/beware-of-the-villainess-manhwa-37012.webp",
+                "Reincarnated as the hated antagonist of a novel, she kicks all the toxic male leads to the curb and lives on her own rules.",
+                listOf("Comedy", "Fantasy", "Isekai", "Villainess", "Manhwa")
+            ),
+            CuratedItem(
+                "the-dead-queens-second-life",
+                "The Dead Queen’s Second Life",
+                "https://cdn.manhwatoon.me/the-dead-queens-second-life-38150.webp",
+                "Executed under false treason charges, the fallen queen returns to the past with a sharp mind ready to outplay every conspirator.",
+                listOf("Reincarnation", "Historical", "Fantasy", "Drama", "Manhwa")
+            ),
+            CuratedItem(
+                "the-wind-mage",
+                "The Wind Mage",
+                "https://cdn.manhwatoon.me/the-wind-mage-37880.webp",
+                "Blessed with tempest magic thought to be extinct, a young student navigates cutthroat magic academy duels.",
+                listOf("Action", "Magic", "Adventure", "Fantasy", "Manhwa")
+            ),
+            CuratedItem(
+                "the-youngest-daughter-of-the-sichuan-tang-family-was-kidnapped",
+                "The Youngest Daughter of the Sichuan Tang Family Was Kidnapped",
+                "https://cdn.manhwatoon.me/the-youngest-daughter-of-the-sichuan-tang-family-was-kidnapped-38165.webp",
+                "Kidnapped from the legendary poison clan, the prodigy heiress returns to the martial world to reclaim her rightful throne.",
+                listOf("Murim", "Martial Arts", "Action", "Historical", "Manhwa")
+            ),
+            CuratedItem(
+                "where-did-all-the-men-go",
+                "Where Did All the Men Go?",
+                "https://cdn.manhwatoon.me/where-did-all-the-men-go-38012.webp",
+                "Thrown into a world where male individuals have mysteriously vanished, one man finds himself in sudden global demand.",
+                listOf("Harem", "Comedy", "Ecchi", "Romance", "Manhwa")
+            ),
+            CuratedItem(
+                "mesmerizing-ghost-doctor",
+                "Mesmerizing Ghost Doctor",
+                "https://cdn.manhwatoon.me/mesmerizing-ghost-doctor-36890.webp",
+                "A modern top surgeon assassin reincarnates into a cultivator world, mastering divine medicine and dominating arrogant cultivators.",
+                listOf("Cultivation", "Action", "Fantasy", "Reincarnation", "Manhwa")
+            ),
+            CuratedItem(
+                "get-out",
+                "Get Out!",
+                "https://cdn.manhwatoon.me/get-out-37540.webp",
+                "Living under one roof brings friction, hidden secrets, and simmering intimacy that neither can resist.",
+                listOf("Drama", "Romance", "Adult", "Manhwa")
+            ),
+            CuratedItem(
+                "hooked-on-you",
+                "Hooked On You",
+                "https://cdn.manhwatoon.me/hooked-on-you-37620.webp",
+                "A captivating romantic entanglement forms when two vastly different worlds collide in high society.",
+                listOf("Romance", "Drama", "Slice of Life", "Manhwa")
+            ),
+            CuratedItem(
+                "i-owe-a-billion-dollars-and-i-am-forced-to-become-a-worker-for-an-evil-god",
+                "I Owe A Billion Dollars And I Am Forced to Become A Worker For An Evil God",
+                "https://cdn.manhwatoon.me/i-owe-a-billion-dollars-and-i-am-forced-to-become-a-worker-for-an-evil-god-37910.webp",
+                "To pay off astronomical debts, he signs a supernatural contract with an eldritch deity and takes on bizarre tasks.",
+                listOf("Comedy", "Supernatural", "Action", "Fantasy", "Manhwa")
+            )
+        )
+
+        return curated.map { item ->
+            val mangaId = "mt_${item.slug}"
+            val tagObjects = item.tags.map { tagName ->
+                TagData(id = tagName.lowercase().replace(" ", "-"), attributes = TagAttributes(name = mapOf("en" to tagName)))
+            }
             MangaData(
                 id = mangaId,
                 attributes = MangaAttributes(
-                    title = mapOf("en" to title),
-                    description = mapOf("en" to "Read Korean manhwa and webtoons free on ManhwaToon."),
+                    title = mapOf("en" to item.title),
+                    description = mapOf("en" to item.synopsis),
                     originalLanguage = "ko",
-                    contentRating = "suggestive",
-                    status = "ongoing"
+                    contentRating = if (item.isAdult) "pornographic" else "suggestive",
+                    status = "ongoing",
+                    tags = tagObjects
                 ),
                 relationships = listOf(
                     Relationship(
                         id = mangaId,
                         type = "cover_art",
-                        attributes = RelationshipAttributes(fileName = cover)
+                        attributes = RelationshipAttributes(fileName = item.cover)
                     ),
                     Relationship(
-                        id = "author_$slug",
+                        id = "author_${item.slug}",
                         type = "author",
                         attributes = RelationshipAttributes(name = "ManhwaToon")
                     )
