@@ -1,6 +1,6 @@
 {
   "name": "Manga Reader",
-  "description": "An Android manga and doujinshi reader app supporting MangaDex, JandaPress multi-source API (Pururin, HentaiFox, 3Hentai), and nHentai with continuous vertical webtoon reading.",
+  "description": "An Android manga, manhwa, and webtoon reader app supporting Manta, ManhwaRead, MangaToon, ManhwaToon, 3D Comics, and MangaDex with unified search and multi-API fresh releases.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

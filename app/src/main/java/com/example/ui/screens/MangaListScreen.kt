@@ -628,9 +628,12 @@ fun HomeScreenContent(
     val featuredManga by viewModel.featuredManga.collectAsState()
     val topRatedMangas by viewModel.topRatedMangas.collectAsState()
     val latestMangas by viewModel.latestMangas.collectAsState()
-    val freshMangas = remember(latestMangas) {
-        latestMangas.filter { !it.attributes?.status.equals("completed", ignoreCase = true) }
+    val allFreshMangas by viewModel.allFreshMangas.collectAsState()
+    val freshMangas = remember(allFreshMangas, latestMangas) {
+        if (allFreshMangas.isNotEmpty()) allFreshMangas else latestMangas.filter { !it.attributes?.status.equals("completed", ignoreCase = true) }
     }
+    val mantaList by viewModel.mantaList.collectAsState()
+    val manhwaReadList by viewModel.manhwaReadList.collectAsState()
     val ecchiComicsList by viewModel.ecchiComicsList.collectAsState()
     val threeDComicsList by viewModel.threeDComicsList.collectAsState()
     val adultWebtoonsList by viewModel.adultWebtoonsList.collectAsState()
@@ -645,6 +648,9 @@ fun HomeScreenContent(
     val manhwaToonSort by viewModel.manhwaToonSort.collectAsState()
     val manhwaToonGenre by viewModel.manhwaToonGenre.collectAsState()
     val isManhwaToonLoading by viewModel.isManhwaToonLoading.collectAsState()
+    val mangaToonList by viewModel.mangaToonList.collectAsState()
+    val mangaToonGenre by viewModel.mangaToonGenre.collectAsState()
+    val isMangaToonLoading by viewModel.isMangaToonLoading.collectAsState()
     val cultivationGoatMangas by viewModel.cultivationGoatMangas.collectAsState()
     val goatMangas by viewModel.goatMangas.collectAsState()
     val fullColorMangas by viewModel.fullColorMangas.collectAsState()
@@ -773,10 +779,13 @@ fun HomeScreenContent(
         mangas, fullColorMangas, adultWebtoonsList, matureNtrLibrary,
         ecchiComicsList, threeDComicsList, goatMangas, adultComicsList,
         parodyMangasList, manhwaCategoryList, mangaCategoryList, manhuaCategoryList,
-        comicsCategoryList, doujinshiList, manhwaToonList, selectedCategory
+        comicsCategoryList, doujinshiList, manhwaToonList, mangaToonList, mantaList, manhwaReadList, selectedCategory
     ) {
         mapOf(
             MangaCategory.ALL to mangas.size,
+            MangaCategory.MANTA to (if (mantaList.isNotEmpty()) mantaList.size else 16),
+            MangaCategory.MANHWAREAD to (if (manhwaReadList.isNotEmpty()) manhwaReadList.size else 15),
+            MangaCategory.MANGATOON to (if (mangaToonList.isNotEmpty()) mangaToonList.size else 12),
             MangaCategory.MANHWATOON to (if (manhwaToonList.isNotEmpty()) manhwaToonList.size else 14),
             MangaCategory.FULL_COLOR to fullColorMangas.size,
             MangaCategory.WEBTOONS to maxOf(comicsCategoryList.size, 25),
@@ -1057,6 +1066,135 @@ fun HomeScreenContent(
                                             fontWeight = FontWeight.ExtraBold,
                                             color = if (isSelected) Color.White else ThemePrimary,
                                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // MangaToon Dedicated Live Scraper Controls & Status
+            if (selectedCategory == MangaCategory.MANGATOON) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF241512)),
+                        border = BorderStroke(1.dp, Color(0xFFFF5722).copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(0xFFFF5722).copy(alpha = 0.25f),
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text("🎨", fontSize = 18.sp)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f, fill = false)) {
+                                        Text(
+                                            "MangaToon.mobi Scraper",
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFFBE9E7)
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            "Live direct HTML scraper from mangatoon.mobi",
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = Color(0xFFFFAB91)
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = if (isMangaToonLoading) Color(0xFFFF9800).copy(alpha = 0.2f) else Color(0xFF4CAF50).copy(alpha = 0.2f),
+                                    border = BorderStroke(1.dp, if (isMangaToonLoading) Color(0xFFFF9800).copy(alpha = 0.6f) else Color(0xFF4CAF50).copy(alpha = 0.6f))
+                                ) {
+                                    Text(
+                                        if (isMangaToonLoading) "SCRAPING..." else "LIVE CONNECTED",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 10.sp,
+                                            color = if (isMangaToonLoading) Color(0xFFFFB74D) else Color(0xFF81C784)
+                                        )
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Genre Filter Chips
+                            Text(
+                                "GENRES",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFF8A65)
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val genres = listOf(
+                                    null to "All Manga",
+                                    "romance" to "💖 Romance",
+                                    "fantasy" to "✨ Fantasy",
+                                    "president" to "👔 CEO / President",
+                                    "urban" to "🏙️ Urban",
+                                    "bl" to "🌸 Boys Love",
+                                    "action" to "⚔️ Action",
+                                    "historical" to "👑 Historical",
+                                    "comedy" to "😂 Comedy",
+                                    "horror" to "👻 Horror",
+                                    "school" to "🏫 Campus",
+                                    "rebirth" to "🔄 Rebirth"
+                                )
+                                genres.forEach { (genreKey, label) ->
+                                    val isGenreSelected = mangaToonGenre == genreKey
+                                    Surface(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(50))
+                                            .clickable {
+                                                viewModel.fetchMangaToon(page = 1, genre = genreKey)
+                                            },
+                                        shape = RoundedCornerShape(50),
+                                        color = if (isGenreSelected) Color(0xFFFF5722) else Color(0xFF3E1F18),
+                                        border = BorderStroke(1.dp, if (isGenreSelected) Color(0xFFFFCCBC) else Color(0xFFBF360C).copy(alpha = 0.5f))
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                color = if (isGenreSelected) Color.White else Color(0xFFFFCCBC),
+                                                fontWeight = if (isGenreSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
                                         )
                                     }
                                 }
@@ -1497,13 +1635,30 @@ fun HomeScreenContent(
         }
 
         // All Manga Feed
-        val displayMangas = if (selectedCategory == MangaCategory.MANHWATOON && manhwaToonList.isNotEmpty()) manhwaToonList else mangas
-        val isFeedLoading = if (selectedCategory == MangaCategory.MANHWATOON) isManhwaToonLoading else isLoading
+        val displayMangas = when {
+            selectedCategory == MangaCategory.MANGATOON && mangaToonList.isNotEmpty() -> mangaToonList
+            selectedCategory == MangaCategory.MANHWATOON && manhwaToonList.isNotEmpty() -> manhwaToonList
+            else -> mangas
+        }
+        val isFeedLoading = when (selectedCategory) {
+            MangaCategory.MANGATOON -> isMangaToonLoading
+            MangaCategory.MANHWATOON -> isManhwaToonLoading
+            else -> isLoading
+        }
 
         item {
             SectionHeader(
-                title = if (selectedCategory == MangaCategory.MANHWATOON) "⚡ ManhwaToon Directory" else if (selectedCategory == MangaCategory.COMIC_3D) "🧊 3D Comics & CG Vault" else "📚 Explore ${selectedCategory.displayName} Directory",
-                subtitle = if (selectedCategory == MangaCategory.MANHWATOON) "${displayMangas.size} titles scraped live" else "${displayMangas.size} titles loaded"
+                title = when (selectedCategory) {
+                    MangaCategory.MANGATOON -> "🎨 MangaToon Directory"
+                    MangaCategory.MANHWATOON -> "⚡ ManhwaToon Directory"
+                    MangaCategory.COMIC_3D -> "🧊 3D Comics & CG Vault"
+                    else -> "📚 Explore ${selectedCategory.displayName} Directory"
+                },
+                subtitle = when (selectedCategory) {
+                    MangaCategory.MANGATOON -> "${displayMangas.size} titles scraped live"
+                    MangaCategory.MANHWATOON -> "${displayMangas.size} titles scraped live"
+                    else -> "${displayMangas.size} titles loaded"
+                }
             )
         }
 
@@ -1764,6 +1919,30 @@ fun FreshReleasesSlider(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // API Source Tag
+                            val (sourceName, sourceColor) = when {
+                                manga.id.startsWith("mta_") -> "🌊 MANTA" to Color(0xFF007AFF)
+                                manga.id.startsWith("mwr_") -> "📖 MANHWAREAD" to Color(0xFF7C4DFF)
+                                manga.id.startsWith("mto_") -> "🎨 MANGATOON" to Color(0xFFFF4081)
+                                manga.id.startsWith("mt_") -> "⚡ MANHWATOON" to Color(0xFF00B0FF)
+                                manga.id.startsWith("3d_") -> "🧊 3D COMIC" to Color(0xFF00E676)
+                                else -> "📚 MANGADEX" to Color(0xFFFF5722)
+                            }
+                            Surface(
+                                color = sourceColor,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    sourceName,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 9.sp,
+                                        color = Color.White
+                                    )
+                                )
+                            }
+
                             Surface(
                                 color = Color(0xFFFF5722),
                                 shape = RoundedCornerShape(6.dp)
@@ -2463,14 +2642,34 @@ fun SearchScreenContent(
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(
-                                        text = if (searchSource == SearchSource.MANHWATOON) {
-                                            "No ManhwaToon titles found for \"$searchQuery\"."
-                                        } else {
-                                            "No manga titles found."
+                                        text = when (searchSource) {
+                                            SearchSource.MANTA -> "No Manta titles found for \"$searchQuery\"."
+                                            SearchSource.MANHWAREAD -> "No ManhwaRead titles found for \"$searchQuery\"."
+                                            SearchSource.MANGATOON -> "No MangaToon titles found for \"$searchQuery\"."
+                                            SearchSource.MANHWATOON -> "No ManhwaToon titles found for \"$searchQuery\"."
+                                            else -> "No manga titles found."
                                         },
                                         color = ThemeOnSurfaceVariant,
                                         style = MaterialTheme.typography.bodyMedium
                                     )
+                                    if (searchSource == SearchSource.MANTA) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        TextButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                            Text("Browse All Manta", color = ThemePrimary)
+                                        }
+                                    }
+                                    if (searchSource == SearchSource.MANHWAREAD) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        TextButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                            Text("Browse All ManhwaRead", color = ThemePrimary)
+                                        }
+                                    }
+                                    if (searchSource == SearchSource.MANGATOON) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        TextButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                            Text("Browse All MangaToon", color = ThemePrimary)
+                                        }
+                                    }
                                     if (searchSource == SearchSource.MANHWATOON) {
                                         Spacer(modifier = Modifier.height(8.dp))
                                         TextButton(onClick = { viewModel.updateSearchQuery("") }) {

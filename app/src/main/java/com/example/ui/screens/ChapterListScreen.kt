@@ -121,14 +121,16 @@ fun ChapterListScreen(
     val comicsCategoryList by viewModel.comicsCategoryList.collectAsState()
     val doujinshiList by viewModel.doujinshiList.collectAsState()
     val manhwaToonList by viewModel.manhwaToonList.collectAsState()
+    val mangaToonList by viewModel.mangaToonList.collectAsState()
 
     val manga = remember(
         mangaId, currentMangaDetail, allMangas, searchMangas, libraryMangas, authorWorks,
         adultWebtoonsList, adultComicsList, parodyMangasList, matureNtrLibrary,
         ecchiComicsList, threeDComicsList, goatMangas, topRatedMangas, latestMangas, comicsCategoryList, doujinshiList,
-        manhwaToonList
+        manhwaToonList, mangaToonList
     ) {
         currentMangaDetail?.takeIf { it.id == mangaId }
+            ?: mangaToonList.find { it.id == mangaId }
             ?: manhwaToonList.find { it.id == mangaId }
             ?: allMangas.find { it.id == mangaId }
             ?: searchMangas.find { it.id == mangaId }

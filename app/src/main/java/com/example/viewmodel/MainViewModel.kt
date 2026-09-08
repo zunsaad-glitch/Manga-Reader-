@@ -32,6 +32,9 @@ enum class SearchMode {
 
 enum class SearchSource(val displayName: String) {
     ALL("All Sources"),
+    MANTA("🌊 Manta"),
+    MANHWAREAD("📖 ManhwaRead"),
+    MANGATOON("🎨 MangaToon"),
     MANHWATOON("⚡ ManhwaToon"),
     MANGADEX("MangaDex"),
     COMIC_3D("🧊 3D Comics")
@@ -44,6 +47,9 @@ enum class MangaCategory(
     val tagId: String? = null
 ) {
     ALL("All", null),
+    MANTA("🌊 Manta", listOf("ko", "en")),
+    MANHWAREAD("📖 ManhwaRead", listOf("ko", "en")),
+    MANGATOON("🎨 MangaToon", listOf("en"), listOf("safe", "suggestive")),
     MANHWATOON("⚡ ManhwaToon", listOf("ko", "en"), listOf("safe", "suggestive", "erotica", "pornographic")),
     FULL_COLOR("🌈 Full Color", null, listOf("safe", "suggestive", "erotica", "pornographic"), "f5ba408b-0e7a-484d-8d49-4e9125ac96de"),
     WEBTOONS("📱 Webtoons", null, listOf("safe", "suggestive", "erotica", "pornographic"), "e197df38-d0e7-43b5-9b09-2842d0c326dd"),
@@ -738,6 +744,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val manhwaToonSort = MutableStateFlow("latest")
     val manhwaToonGenre = MutableStateFlow<String?>(null)
     val isManhwaToonLoading = MutableStateFlow(false)
+    val mangaToonList = MutableStateFlow<List<MangaData>>(emptyList())
+    val mangaToonGenre = MutableStateFlow<String?>(null)
+    val isMangaToonLoading = MutableStateFlow(false)
+    val mantaList = MutableStateFlow<List<MangaData>>(emptyList())
+    val isMantaLoading = MutableStateFlow(false)
+    val manhwaReadList = MutableStateFlow<List<MangaData>>(emptyList())
+    val isManhwaReadLoading = MutableStateFlow(false)
+    val allFreshMangas = MutableStateFlow<List<MangaData>>(emptyList())
     val specialInterestMangas = MutableStateFlow<List<MangaData>>(emptyList())
     val cultivationGoatMangas = MutableStateFlow<List<MangaData>>(emptyList())
     val overflowMangas = MutableStateFlow<List<MangaData>>(emptyList())
@@ -806,6 +820,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             fetchOverflowMangas()
             fetchFeaturedAuthors()
             fetchManhwaToon()
+            fetchMangaToon()
+            fetchManta()
+            fetchManhwaRead()
         }
     }
 
@@ -838,6 +855,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 threeDComicsList.value = curated
                 fetchThreeDComics()
                 curated
+            }
+            mangas.value = list
+            isLoading.value = false
+            hasMoreHome.value = false
+        } else if (category == MangaCategory.MANTA) {
+            val list = if (mantaList.value.isNotEmpty()) {
+                mantaList.value
+            } else {
+                val curated = com.example.repository.MantaRepository.getCuratedSnapshot()
+                mantaList.value = curated
+                fetchManta()
+                curated
+            }
+            mangas.value = list
+            isLoading.value = false
+            hasMoreHome.value = false
+        } else if (category == MangaCategory.MANHWAREAD) {
+            val list = if (manhwaReadList.value.isNotEmpty()) {
+                manhwaReadList.value
+            } else {
+                val curated = com.example.repository.ManhwaReadRepository.getCuratedSnapshot()
+                manhwaReadList.value = curated
+                fetchManhwaRead()
+                curated
+            }
+            mangas.value = list
+            isLoading.value = false
+            hasMoreHome.value = false
+        } else if (category == MangaCategory.MANGATOON) {
+            val list = if (mangaToonList.value.isNotEmpty()) {
+                mangaToonList.value
+            } else {
+                val snapshot = com.example.repository.MangaToonRepository.getCuratedSnapshot()
+                mangaToonList.value = snapshot
+                fetchMangaToon()
+                snapshot
+            }
+            mangas.value = list
+            isLoading.value = false
+            hasMoreHome.value = false
+        } else if (category == MangaCategory.MANHWATOON) {
+            val list = if (manhwaToonList.value.isNotEmpty()) {
+                manhwaToonList.value
+            } else {
+                val snapshot = com.example.repository.ManhwaToonRepository.getCuratedSnapshot()
+                manhwaToonList.value = snapshot
+                fetchManhwaToon()
+                snapshot
             }
             mangas.value = list
             isLoading.value = false
@@ -1392,10 +1457,152 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var mangaToonPageNumber = 1
+
+    fun fetchMangaToon(page: Int = 1, genre: String? = null) {
+        viewModelScope.launch {
+            isMangaToonLoading.value = true
+            mangaToonGenre.value = genre
+            mangaToonPageNumber = page
+            try {
+                if (mangaToonList.value.isEmpty()) {
+                    val snapshot = com.example.repository.MangaToonRepository.getCuratedSnapshot()
+                    mangaToonList.value = snapshot
+                    if (selectedCategory.value == MangaCategory.MANGATOON) {
+                        mangas.value = snapshot
+                    }
+                }
+                val list = com.example.repository.MangaToonRepository.getMangaList(page, genre)
+                if (list.isNotEmpty()) {
+                    mangaToonList.value = list
+                    if (selectedCategory.value == MangaCategory.MANGATOON) {
+                        mangas.value = list
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error fetching MangaToon", e)
+            } finally {
+                isMangaToonLoading.value = false
+                isLoading.value = false
+            }
+        }
+    }
+
+    fun loadMoreMangaToon() {
+        viewModelScope.launch {
+            if (isMangaToonLoading.value) return@launch
+            isMangaToonLoading.value = true
+            mangaToonPageNumber++
+            try {
+                val nextPage = com.example.repository.MangaToonRepository.getMangaList(
+                    page = mangaToonPageNumber,
+                    genre = mangaToonGenre.value
+                )
+                if (nextPage.isNotEmpty()) {
+                    val combined = (mangaToonList.value + nextPage).distinctBy { it.id }
+                    mangaToonList.value = combined
+                    if (selectedCategory.value == MangaCategory.MANGATOON) {
+                        mangas.value = combined
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error loading more MangaToon", e)
+            } finally {
+                isMangaToonLoading.value = false
+            }
+        }
+    }
+
+    fun fetchManta() {
+        viewModelScope.launch {
+            isMantaLoading.value = true
+            try {
+                if (mantaList.value.isEmpty()) {
+                    val snapshot = com.example.repository.MantaRepository.getCuratedSnapshot()
+                    mantaList.value = snapshot
+                    if (selectedCategory.value == MangaCategory.MANTA) {
+                        mangas.value = snapshot
+                    }
+                }
+                val fresh = com.example.repository.MantaRepository.getFreshReleases()
+                if (fresh.isNotEmpty()) {
+                    mantaList.value = fresh
+                    if (selectedCategory.value == MangaCategory.MANTA) {
+                        mangas.value = fresh
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error fetching Manta", e)
+            } finally {
+                isMantaLoading.value = false
+                updateAllFreshMangas()
+            }
+        }
+    }
+
+    fun fetchManhwaRead() {
+        viewModelScope.launch {
+            isManhwaReadLoading.value = true
+            try {
+                if (manhwaReadList.value.isEmpty()) {
+                    val snapshot = com.example.repository.ManhwaReadRepository.getCuratedSnapshot()
+                    manhwaReadList.value = snapshot
+                    if (selectedCategory.value == MangaCategory.MANHWAREAD) {
+                        mangas.value = snapshot
+                    }
+                }
+                val fresh = com.example.repository.ManhwaReadRepository.getFreshReleases()
+                if (fresh.isNotEmpty()) {
+                    manhwaReadList.value = fresh
+                    if (selectedCategory.value == MangaCategory.MANHWAREAD) {
+                        mangas.value = fresh
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error fetching ManhwaRead", e)
+            } finally {
+                isManhwaReadLoading.value = false
+                updateAllFreshMangas()
+            }
+        }
+    }
+
+    fun updateAllFreshMangas() {
+        val list = mutableListOf<MangaData>()
+        val seen = mutableSetOf<String>()
+
+        val mantaFresh = mantaList.value
+        val manhwaReadFresh = manhwaReadList.value
+        val mangaToonFresh = mangaToonList.value
+        val manhwaToonFresh = manhwaToonList.value
+        val dexFresh = latestMangas.value.filter { !it.attributes?.status.equals("completed", ignoreCase = true) }
+
+        val maxSize = maxOf(
+            mantaFresh.size,
+            manhwaReadFresh.size,
+            mangaToonFresh.size,
+            manhwaToonFresh.size,
+            dexFresh.size
+        )
+        for (i in 0 until maxSize) {
+            if (i < mantaFresh.size && seen.add(mantaFresh[i].id)) list.add(mantaFresh[i])
+            if (i < manhwaReadFresh.size && seen.add(manhwaReadFresh[i].id)) list.add(manhwaReadFresh[i])
+            if (i < mangaToonFresh.size && seen.add(mangaToonFresh[i].id)) list.add(mangaToonFresh[i])
+            if (i < manhwaToonFresh.size && seen.add(manhwaToonFresh[i].id)) list.add(manhwaToonFresh[i])
+            if (i < dexFresh.size && seen.add(dexFresh[i].id)) list.add(dexFresh[i])
+        }
+        if (list.isNotEmpty()) {
+            allFreshMangas.value = list
+        }
+    }
+
     fun fetchMangaDetail(mangaId: String) {
         fetchMangaDetailJob?.cancel()
         fetchMangaDetailJob = viewModelScope.launch {
-            val local = manhwaToonList.value.find { it.id == mangaId }
+            val local = mantaList.value.find { it.id == mangaId }
+                ?: manhwaReadList.value.find { it.id == mangaId }
+                ?: mangaToonList.value.find { it.id == mangaId }
+                ?: manhwaToonList.value.find { it.id == mangaId }
                 ?: mangas.value.find { it.id == mangaId }
                 ?: searchMangas.value.find { it.id == mangaId }
                 ?: libraryMangas.value.find { it.id == mangaId }
@@ -1419,6 +1626,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentMangaDetail.value = local
             if (local != null) {
                 fetchSimilarMangas(local)
+            }
+
+            // Scraped Manta detail check
+            if (com.example.repository.MantaRepository.isMantaId(mangaId)) {
+                val mtaDetail = com.example.repository.MantaRepository.getMangaDetails(mangaId)
+                if (mtaDetail != null) {
+                    currentMangaDetail.value = mtaDetail
+                    fetchSimilarMangas(mtaDetail)
+                    return@launch
+                }
+            }
+
+            // Scraped ManhwaRead detail check
+            if (com.example.repository.ManhwaReadRepository.isManhwaReadId(mangaId)) {
+                val mwrDetail = com.example.repository.ManhwaReadRepository.getMangaDetails(mangaId)
+                if (mwrDetail != null) {
+                    currentMangaDetail.value = mwrDetail
+                    fetchSimilarMangas(mwrDetail)
+                    return@launch
+                }
+            }
+
+            // Scraped MangaToon detail check
+            if (com.example.repository.MangaToonRepository.isMangaToonId(mangaId)) {
+                val mtoDetail = com.example.repository.MangaToonRepository.getMangaDetails(mangaId)
+                if (mtoDetail != null) {
+                    currentMangaDetail.value = mtoDetail
+                    fetchSimilarMangas(mtoDetail)
+                    return@launch
+                }
             }
 
             // Scraped ManhwaToon detail check
@@ -1685,6 +1922,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     (latest18Res + latestGeneralRes).filter { !it.attributes?.status.equals("completed", ignoreCase = true) }
                 }
+                updateAllFreshMangas()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1950,6 +2188,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             homeOffset = 0
             hasMoreHome.value = true
             try {
+                if (selectedCategory.value == MangaCategory.MANGATOON) {
+                    fetchMangaToon(page = 1, genre = mangaToonGenre.value)
+                    return@launch
+                }
+
                 if (selectedCategory.value == MangaCategory.MANHWATOON) {
                     fetchManhwaToon(page = 1, sort = manhwaToonSort.value, genre = manhwaToonGenre.value)
                     return@launch
@@ -2060,6 +2303,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun loadMoreMangas() {
         if (isLoadingMoreHome.value || !hasMoreHome.value || isLoading.value) return
         viewModelScope.launch {
+            if (selectedCategory.value == MangaCategory.MANGATOON) {
+                loadMoreMangaToon()
+                return@launch
+            }
+
             if (selectedCategory.value == MangaCategory.MANHWATOON) {
                 loadMoreManhwaToon()
                 return@launch
@@ -2253,6 +2501,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Handle blank query based on source or category
         if (query.isBlank()) {
             when {
+                searchSource.value == SearchSource.MANTA || selectedCategory.value == MangaCategory.MANTA -> {
+                    searchMangas.value = mantaList.value.ifEmpty { com.example.repository.MantaRepository.getCuratedSnapshot() }
+                    authorSearchResults.value = emptyList()
+                    isSearching.value = false
+                    hasMoreSearch.value = false
+                    return
+                }
+                searchSource.value == SearchSource.MANHWAREAD || selectedCategory.value == MangaCategory.MANHWAREAD -> {
+                    searchMangas.value = manhwaReadList.value.ifEmpty { com.example.repository.ManhwaReadRepository.getCuratedSnapshot() }
+                    authorSearchResults.value = emptyList()
+                    isSearching.value = false
+                    hasMoreSearch.value = false
+                    return
+                }
+                searchSource.value == SearchSource.MANGATOON || selectedCategory.value == MangaCategory.MANGATOON -> {
+                    searchMangas.value = mangaToonList.value.ifEmpty { com.example.repository.MangaToonRepository.getCuratedSnapshot() }
+                    authorSearchResults.value = emptyList()
+                    isSearching.value = false
+                    hasMoreSearch.value = false
+                    return
+                }
                 searchSource.value == SearchSource.MANHWATOON || selectedCategory.value == MangaCategory.MANHWATOON -> {
                     searchMangas.value = manhwaToonList.value.ifEmpty { com.example.repository.ManhwaToonRepository.getCuratedSnapshot() }
                     authorSearchResults.value = emptyList()
@@ -2283,6 +2552,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             hasMoreSearch.value = true
             try {
                 val qLower = query.lowercase().trim()
+
+                // Check if user specifically requested Manta or is in Manta tab
+                val isMantaTarget = searchSource.value == SearchSource.MANTA ||
+                        selectedCategory.value == MangaCategory.MANTA ||
+                        qLower == "manta" || qLower == "manta.net"
+
+                if (isMantaTarget) {
+                    val mtaResults = com.example.repository.MantaRepository.searchManga(query)
+                    searchMangas.value = mtaResults
+                    hasMoreSearch.value = false
+                    isSearching.value = false
+                    return@launch
+                }
+
+                // Check if user specifically requested ManhwaRead or is in ManhwaRead tab
+                val isManhwaReadTarget = searchSource.value == SearchSource.MANHWAREAD ||
+                        selectedCategory.value == MangaCategory.MANHWAREAD ||
+                        qLower == "manhwaread" || qLower == "manhwa read"
+
+                if (isManhwaReadTarget) {
+                    val mwrResults = com.example.repository.ManhwaReadRepository.searchManga(query)
+                    searchMangas.value = mwrResults
+                    hasMoreSearch.value = mwrResults.size >= 10
+                    isSearching.value = false
+                    return@launch
+                }
+
+                // Check if user specifically requested MangaToon or is in MangaToon tab
+                val isMangaToonTarget = searchSource.value == SearchSource.MANGATOON ||
+                        selectedCategory.value == MangaCategory.MANGATOON ||
+                        qLower == "mangatoon" || qLower == "manga toon"
+
+                if (isMangaToonTarget) {
+                    val mtoResults = com.example.repository.MangaToonRepository.searchManga(query)
+                    searchMangas.value = mtoResults
+                    hasMoreSearch.value = mtoResults.size >= 10
+                    isSearching.value = false
+                    return@launch
+                }
 
                 // Check if user specifically requested ManhwaToon or is in ManhwaToon tab
                 val isManhwaToonTarget = searchSource.value == SearchSource.MANHWATOON ||
@@ -2376,7 +2684,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                // Launch concurrent ManhwaToon search if in ALL sources mode and TITLE search
+                // Concurrently search all external APIs (Manta, ManhwaRead, MangaToon, ManhwaToon) if in ALL sources mode and TITLE search
+                val shouldSearchManta = (searchSource.value == SearchSource.ALL || searchSource.value == SearchSource.MANTA) && searchMode.value == SearchMode.TITLE
+                val mtaDeferred: kotlinx.coroutines.Deferred<List<MangaData>>? = if (shouldSearchManta) {
+                    async {
+                        try {
+                            com.example.repository.MantaRepository.searchManga(query)
+                        } catch (e: Exception) {
+                            emptyList<MangaData>()
+                        }
+                    }
+                } else null
+
+                val shouldSearchManhwaRead = (searchSource.value == SearchSource.ALL || searchSource.value == SearchSource.MANHWAREAD) && searchMode.value == SearchMode.TITLE
+                val mwrDeferred: kotlinx.coroutines.Deferred<List<MangaData>>? = if (shouldSearchManhwaRead) {
+                    async {
+                        try {
+                            com.example.repository.ManhwaReadRepository.searchManga(query)
+                        } catch (e: Exception) {
+                            emptyList<MangaData>()
+                        }
+                    }
+                } else null
+
+                val shouldSearchMangaToon = (searchSource.value == SearchSource.ALL || searchSource.value == SearchSource.MANGATOON) && searchMode.value == SearchMode.TITLE
+                val mtoDeferred: kotlinx.coroutines.Deferred<List<MangaData>>? = if (shouldSearchMangaToon) {
+                    async {
+                        try {
+                            com.example.repository.MangaToonRepository.searchManga(query)
+                        } catch (e: Exception) {
+                            emptyList<MangaData>()
+                        }
+                    }
+                } else null
+
                 val shouldSearchManhwaToon = (searchSource.value == SearchSource.ALL || searchSource.value == SearchSource.MANHWATOON) && searchMode.value == SearchMode.TITLE
                 val mtDeferred: kotlinx.coroutines.Deferred<List<MangaData>>? = if (shouldSearchManhwaToon) {
                     async {
@@ -2414,6 +2755,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
+                val mtaResults = mtaDeferred?.await() ?: emptyList()
+                val mwrResults = mwrDeferred?.await() ?: emptyList()
+                val mtoResults = mtoDeferred?.await() ?: emptyList()
                 val mtResults = mtDeferred?.await() ?: emptyList()
                 val threeDMatches = if (searchSource.value == SearchSource.ALL && finalTitle != null) {
                     threeDComicsList.value.filter {
@@ -2422,17 +2766,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } else emptyList()
 
-                // Merge results: ManhwaToon + MangaDex + 3D Comics
-                val combined = (mtResults + response.data + threeDMatches).distinctBy { it.id }
+                // Merge results: Manta + ManhwaRead + MangaToon + ManhwaToon + MangaDex + 3D Comics
+                val combined = (mtaResults + mwrResults + mtoResults + mtResults + response.data + threeDMatches).distinctBy { it.id }
                 searchMangas.value = combined
                 searchOffset = response.data.size
-                hasMoreSearch.value = response.data.size >= 30 || mtResults.size >= 10
+                hasMoreSearch.value = response.data.size >= 30 || mtResults.size >= 10 || mtoResults.size >= 10 || mwrResults.size >= 10
             } catch (e: Exception) {
                 e.printStackTrace()
-                // On error, check if ManhwaToon has matching titles
+                // On error, check if Manta, ManhwaRead, MangaToon, or ManhwaToon has matching titles
+                val mtaFallback = com.example.repository.MantaRepository.searchManga(query)
+                val mwrFallback = com.example.repository.ManhwaReadRepository.searchManga(query)
+                val mtoFallback = com.example.repository.MangaToonRepository.searchManga(query)
                 val mtFallback = com.example.repository.ManhwaToonRepository.searchManga(query)
-                if (mtFallback.isNotEmpty()) {
-                    searchMangas.value = mtFallback
+                val fallbackCombined = (mtaFallback + mwrFallback + mtoFallback + mtFallback).distinctBy { it.id }
+                if (fallbackCombined.isNotEmpty()) {
+                    searchMangas.value = fallbackCombined
                     hasMoreSearch.value = false
                 }
             } finally {
@@ -2448,6 +2796,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isSearchingMore.value = true
             try {
+                if (searchSource.value == SearchSource.MANHWAREAD || selectedCategory.value == MangaCategory.MANHWAREAD) {
+                    val page = (searchMangas.value.size / 15) + 1
+                    val more = com.example.repository.ManhwaReadRepository.searchManga(query, page = page)
+                    if (more.isEmpty()) {
+                        hasMoreSearch.value = false
+                    } else {
+                        val currentList = searchMangas.value.toMutableList()
+                        val existingIds = currentList.map { it.id }.toSet()
+                        val filteredNew = more.filter { !existingIds.contains(it.id) }
+                        currentList.addAll(filteredNew)
+                        searchMangas.value = currentList
+                        hasMoreSearch.value = more.size >= 10
+                    }
+                    return@launch
+                }
+
+                if (searchSource.value == SearchSource.MANGATOON || selectedCategory.value == MangaCategory.MANGATOON) {
+                    val page = (searchMangas.value.size / 15) + 1
+                    val more = com.example.repository.MangaToonRepository.searchManga(query, page = page)
+                    if (more.isEmpty()) {
+                        hasMoreSearch.value = false
+                    } else {
+                        val currentList = searchMangas.value.toMutableList()
+                        val existingIds = currentList.map { it.id }.toSet()
+                        val filteredNew = more.filter { !existingIds.contains(it.id) }
+                        currentList.addAll(filteredNew)
+                        searchMangas.value = currentList
+                        hasMoreSearch.value = more.size >= 10
+                    }
+                    return@launch
+                }
+
                 if (searchSource.value == SearchSource.MANHWATOON || selectedCategory.value == MangaCategory.MANHWATOON) {
                     val page = (searchMangas.value.size / 10) + 1
                     val more = com.example.repository.ManhwaToonRepository.searchManga(query, page = page)
@@ -2591,6 +2971,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
+            // Manta titles: use scraped related recommendations
+            if (com.example.repository.MantaRepository.isMantaId(manga.id)) {
+                val scrapedRelated = com.example.repository.MantaRepository.getRelatedMangas(manga.id)
+                if (scrapedRelated.isNotEmpty()) {
+                    similarMangas.value = scrapedRelated
+                    return@launch
+                }
+                val allMta = mantaList.value.ifEmpty { com.example.repository.MantaRepository.getCuratedSnapshot() }
+                val fallback = allMta.filter { it.id != manga.id }.shuffled().take(8)
+                similarMangas.value = fallback
+                return@launch
+            }
+
+            // ManhwaRead titles: use scraped related recommendations
+            if (com.example.repository.ManhwaReadRepository.isManhwaReadId(manga.id)) {
+                val scrapedRelated = com.example.repository.ManhwaReadRepository.getRelatedMangas(manga.id)
+                if (scrapedRelated.isNotEmpty()) {
+                    similarMangas.value = scrapedRelated
+                    return@launch
+                }
+                val allMwr = manhwaReadList.value.ifEmpty { com.example.repository.ManhwaReadRepository.getCuratedSnapshot() }
+                val fallback = allMwr.filter { it.id != manga.id }.shuffled().take(8)
+                similarMangas.value = fallback
+                return@launch
+            }
+
+            // 0. MangaToon titles: use scraped related recommendations
+            if (com.example.repository.MangaToonRepository.isMangaToonId(manga.id)) {
+                val scrapedRelated = com.example.repository.MangaToonRepository.getRelatedMangas(manga.id)
+                if (scrapedRelated.isNotEmpty()) {
+                    similarMangas.value = scrapedRelated
+                    return@launch
+                }
+                val allMto = mangaToonList.value.ifEmpty { com.example.repository.MangaToonRepository.getCuratedSnapshot() }
+                val fallback = allMto.filter { it.id != manga.id }.shuffled().take(8)
+                similarMangas.value = fallback
+                return@launch
+            }
+
             // 1. ManhwaToon titles: use scraped 'YOU MAY ALSO LIKE' related recommendations
             if (com.example.repository.ManhwaToonRepository.isManhwaToonId(manga.id)) {
                 val scrapedRelated = com.example.repository.ManhwaToonRepository.getRelatedMangas(manga.id)
@@ -2715,7 +3134,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // If we don't have images yet, fetch them
                 val pagesToDownload = mutableListOf<String>()
-                if (com.example.repository.ManhwaToonRepository.isManhwaToonId(chapter.id)) {
+                if (com.example.repository.MantaRepository.isMantaId(chapter.id)) {
+                    val mtaPages = com.example.repository.MantaRepository.getChapterImages(chapter.id)
+                    if (mtaPages.isNotEmpty()) {
+                        pagesToDownload.addAll(mtaPages)
+                    }
+                }
+
+                if (pagesToDownload.isEmpty() && com.example.repository.ManhwaReadRepository.isManhwaReadId(chapter.id)) {
+                    val mwrPages = com.example.repository.ManhwaReadRepository.getChapterImages(chapter.id)
+                    if (mwrPages.isNotEmpty()) {
+                        pagesToDownload.addAll(mwrPages)
+                    }
+                }
+
+                if (pagesToDownload.isEmpty() && com.example.repository.MangaToonRepository.isMangaToonId(chapter.id)) {
+                    val mtoPages = com.example.repository.MangaToonRepository.getChapterImages(chapter.id)
+                    if (mtoPages.isNotEmpty()) {
+                        pagesToDownload.addAll(mtoPages)
+                    }
+                }
+
+                if (pagesToDownload.isEmpty() && com.example.repository.ManhwaToonRepository.isManhwaToonId(chapter.id)) {
                     val mtPages = com.example.repository.ManhwaToonRepository.getChapterImages(chapter.id)
                     if (mtPages.isNotEmpty()) {
                         pagesToDownload.addAll(mtPages)
@@ -2844,6 +3284,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val threeDChapters = com.example.repository.ThreeDComicsRepository.getChaptersForManga(mangaId)
                     if (!threeDChapters.isNullOrEmpty()) {
                         allRawChapters.value = threeDChapters
+                        availableLanguages.value = listOf("en")
+                        selectedChapterLanguage.value = "en"
+                        updateDisplayedChapters()
+                        isLoading.value = false
+                        return@launch
+                    }
+                }
+
+                // 1.52. Check if this is a scraped Manta manga
+                if (com.example.repository.MantaRepository.isMantaId(mangaId)) {
+                    val mtaChapters = com.example.repository.MantaRepository.getChapters(mangaId)
+                    if (mtaChapters.isNotEmpty()) {
+                        allRawChapters.value = mtaChapters
+                        availableLanguages.value = listOf("en")
+                        selectedChapterLanguage.value = "en"
+                        updateDisplayedChapters()
+                        isLoading.value = false
+                        return@launch
+                    }
+                }
+
+                // 1.54. Check if this is a scraped ManhwaRead manga
+                if (com.example.repository.ManhwaReadRepository.isManhwaReadId(mangaId)) {
+                    val mwrChapters = com.example.repository.ManhwaReadRepository.getChapters(mangaId)
+                    if (mwrChapters.isNotEmpty()) {
+                        allRawChapters.value = mwrChapters
+                        availableLanguages.value = listOf("en")
+                        selectedChapterLanguage.value = "en"
+                        updateDisplayedChapters()
+                        isLoading.value = false
+                        return@launch
+                    }
+                }
+
+                // 1.55. Check if this is a scraped MangaToon manga
+                if (com.example.repository.MangaToonRepository.isMangaToonId(mangaId)) {
+                    val mtoChapters = com.example.repository.MangaToonRepository.getChapters(mangaId)
+                    if (mtoChapters.isNotEmpty()) {
+                        allRawChapters.value = mtoChapters
                         availableLanguages.value = listOf("en")
                         selectedChapterLanguage.value = "en"
                         updateDisplayedChapters()
@@ -3070,6 +3549,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val threeDPages = com.example.repository.ThreeDComicsRepository.getPageUrlsForChapter(chapterId)
                     if (!threeDPages.isNullOrEmpty()) {
                         imageUrls.value = threeDPages
+                        return@launch
+                    }
+                }
+
+                // 1.52. Check if this is a scraped Manta chapter
+                if (com.example.repository.MantaRepository.isMantaId(chapterId)) {
+                    val mtaPages = com.example.repository.MantaRepository.getChapterImages(chapterId)
+                    if (mtaPages.isNotEmpty()) {
+                        imageUrls.value = mtaPages
+                        return@launch
+                    }
+                }
+
+                // 1.54. Check if this is a scraped ManhwaRead chapter
+                if (com.example.repository.ManhwaReadRepository.isManhwaReadId(chapterId)) {
+                    val mwrPages = com.example.repository.ManhwaReadRepository.getChapterImages(chapterId)
+                    if (mwrPages.isNotEmpty()) {
+                        imageUrls.value = mwrPages
+                        return@launch
+                    }
+                }
+
+                // 1.55. Check if this is a scraped MangaToon chapter
+                if (com.example.repository.MangaToonRepository.isMangaToonId(chapterId)) {
+                    val mtoPages = com.example.repository.MangaToonRepository.getChapterImages(chapterId)
+                    if (mtoPages.isNotEmpty()) {
+                        imageUrls.value = mtoPages
                         return@launch
                     }
                 }

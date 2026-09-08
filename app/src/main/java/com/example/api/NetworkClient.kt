@@ -205,6 +205,9 @@ object NetworkClient {
                 host.contains("manhwatoon") -> {
                     reqBuilder.header("Referer", "https://www.manhwatoon.me/")
                 }
+                host.contains("mangatoon") -> {
+                    reqBuilder.header("Referer", "https://mangatoon.mobi/")
+                }
                 else -> {
                     reqBuilder.header("Referer", "https://$host/")
                 }
@@ -215,6 +218,7 @@ object NetworkClient {
                     host.contains("hentaifox") || host.contains("3hentai") ||
                     host.contains("mangadex") || host.contains("simply-hentai") ||
                     host.contains("asmhentai") || host.contains("manhwatoon") ||
+                    host.contains("mangatoon") ||
                     path.endsWith(".jpg") || path.endsWith(".jpeg") ||
                     path.endsWith(".png") || path.endsWith(".webp") ||
                     path.endsWith(".gif") || path.contains("/covers/") ||
