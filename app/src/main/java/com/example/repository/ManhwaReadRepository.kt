@@ -73,7 +73,8 @@ object ManhwaReadRepository {
                         contentRating = "suggestive",
                         tags = tagList.distinctBy { it.id },
                         originalLanguage = "ko",
-                        latestUploadedChapter = latestChapter
+                        latestUploadedChapter = latestChapter,
+                        lastChapter = latestChapter?.let { Regex("""(?:chapter|ch\.?)\s*(\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) }
                     ),
                     relationships = listOf(
                         Relationship(
@@ -238,6 +239,11 @@ object ManhwaReadRepository {
         return list
     }
 
+    fun getCachedChapterCount(mangaId: String): Int {
+        val slug = extractCleanSlug(mangaId)
+        return chaptersCache["mwr_$slug"]?.size ?: chaptersCache[mangaId]?.size ?: 0
+    }
+
     suspend fun getChapterImages(chapterId: String): List<String> = withContext(Dispatchers.IO) {
         val clean = chapterId.removePrefix("mwr_ch_")
         val slug = clean.substringBefore("_chapter-").substringBefore("_ch-")
@@ -325,6 +331,7 @@ object ManhwaReadRepository {
 
         all.addAll(getFreshReleases())
         all.addAll(getCuratedSnapshot())
+        all.addAll(seriesCache.values)
 
         if (qLower.isBlank() || qLower == "manhwaread" || qLower == "manhwa read") {
             return@withContext all.distinctBy { it.id }

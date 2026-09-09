@@ -57,13 +57,15 @@ data class RelationshipAttributes(
 
 data class MangaAttributes(
     @SerializedName("title") val title: Map<String, String>? = emptyMap(),
+    @SerializedName("altTitles") val altTitles: List<Map<String, String>>? = null,
     @SerializedName("description") val description: Map<String, String>? = null,
     @SerializedName("originalLanguage") val originalLanguage: String? = null,
     @SerializedName("contentRating") val contentRating: String? = null,
     @SerializedName("status") val status: String? = null,
     @SerializedName("tags") val tags: List<TagData>? = null,
     @SerializedName("updatedAt") val updatedAt: String? = null,
-    @SerializedName("latestUploadedChapter") val latestUploadedChapter: String? = null
+    @SerializedName("latestUploadedChapter") val latestUploadedChapter: String? = null,
+    @SerializedName("lastChapter") val lastChapter: String? = null
 )
 
 data class ChapterListResponse(

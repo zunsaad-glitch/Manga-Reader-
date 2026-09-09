@@ -2359,6 +2359,30 @@ fun MangaFeedCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val (sourceName, sourceColor) = when {
+                            manga.id.startsWith("mta_") -> "MANTA" to Color(0xFF2979FF)
+                            manga.id.startsWith("mwr_") -> "MANHWAREAD" to Color(0xFF7C4DFF)
+                            manga.id.startsWith("mto_") -> "MANGATOON" to Color(0xFFFF4081)
+                            manga.id.startsWith("mt_") -> "MANHWATOON" to Color(0xFF00B0FF)
+                            manga.id.startsWith("3d_") -> "3D COMIC" to Color(0xFF00E676)
+                            else -> "MANGADEX" to Color(0xFFFF6D00)
+                        }
+                        Surface(
+                            color = sourceColor.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(1.dp, sourceColor.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = sourceName,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = sourceColor
+                                )
+                            )
+                        }
+
                         val isFullColor = manga.attributes?.tags?.any { tag ->
                             val name = tag.attributes?.name?.get("en") ?: ""
                             name.equals("Full Color", ignoreCase = true) || name.equals("Official Colored", ignoreCase = true)

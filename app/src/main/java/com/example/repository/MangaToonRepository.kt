@@ -498,6 +498,11 @@ object MangaToonRepository {
         }
     }
 
+    fun getCachedChapterCount(mangaId: String): Int {
+        val cid = extractContentId(mangaId)
+        return chapterCache["mto_$cid"]?.size ?: chapterCache[mangaId]?.size ?: 0
+    }
+
     /**
      * Parse episodes from detail page DOM
      */

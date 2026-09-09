@@ -335,6 +335,11 @@ object MantaRepository {
         return list
     }
 
+    fun getCachedChapterCount(mangaId: String): Int {
+        val cid = extractCleanId(mangaId)
+        return chaptersCache["mta_$cid"]?.size ?: chaptersCache[mangaId]?.size ?: 0
+    }
+
     suspend fun getChapterImages(chapterId: String): List<String> = withContext(Dispatchers.IO) {
         // Return rich webtoon vertical reader panels
         val clean = chapterId.removePrefix("mta_ch_")
@@ -371,6 +376,7 @@ object MantaRepository {
         val all = mutableListOf<MangaData>()
         all.addAll(getFreshReleases())
         all.addAll(getCuratedSnapshot())
+        all.addAll(seriesCache.values)
 
         if (qLower.isBlank() || qLower == "manta" || qLower == "manta.net") {
             return@withContext all.distinctBy { it.id }
@@ -525,6 +531,38 @@ object MantaRepository {
                 desc = "Infamous prison escapee Rosen Walker is escorted aboard a naval warship by war hero Ian Connor. A masterclass in psychological romance and deceit.",
                 author = "Kkokko, Jeon So-hee",
                 tags = listOf("Romance", "Psychological", "Drama", "Enemies to Lovers", "Historical")
+            ),
+            createMantaEntry(
+                id = "1647",
+                title = "Disobey the Duke if You Dare",
+                cover = "https://static.mantacdn.net/thumb/2023-08-10/wy/wyv0tgyYZrUYA2Cb.jpg",
+                desc = "Lily is forced to marry the notoriously terrifying Duke Vlad. Under the veil of darkness he is gentle and affectionate, but she is forbidden from looking upon his face.",
+                author = "Chan, Banji",
+                tags = listOf("Romantasy", "Historical", "Mystery", "Devoted ML", "Royalty")
+            ),
+            createMantaEntry(
+                id = "2013",
+                title = "I've Become a True Villainess",
+                cover = "https://static.mantacdn.net/thumb/2024-02-07/8o/8o5HHACGO3NcyoZc.jpg",
+                desc = "Transmigrated into Seria Stern, the notorious high-society villainess doomed to die. Can she overturn the novel's script and conquer the heart of Grand Duke Rouche?",
+                author = "Park Gyeong-won, Han Heun",
+                tags = listOf("Romantasy", "Isekai", "Villainess", "Reincarnation", "Nobility")
+            ),
+            createMantaEntry(
+                id = "1720",
+                title = "Fly Me to the Moon",
+                cover = "https://static.mantacdn.net/thumb/2024-01-22/2E/2EUCwXIdq9ImAkoh.jpg",
+                desc = "Jeongyeon is an outcast marked by tragic omens. When supernatural monsters threaten her life, an enigmatic, possessive savior appears from the shadows.",
+                author = "MaSeol, Studio Manta",
+                tags = listOf("Fantasy", "Supernatural", "Romance", "Monsters", "Mystery")
+            ),
+            createMantaEntry(
+                id = "2115",
+                title = "Winter Wolf",
+                cover = "https://static.mantacdn.net/thumb/2024-04-02/Xd/XdNUbFhP3OFs5FdS.jpg",
+                desc = "Lysia seeks refuge in an isolated winter cabin deep in the snowy peaks, only to find it occupied by a dangerous, rugged mercenary with secrets of his own.",
+                author = "Chung, Team Manta",
+                tags = listOf("Romance", "Historical", "Steamy", "Survival", "Suspense")
             )
         )
     }

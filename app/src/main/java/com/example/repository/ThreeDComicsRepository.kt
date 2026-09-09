@@ -946,6 +946,18 @@ object ThreeDComicsRepository {
         }
     }
 
+    fun searchManga(query: String): List<MangaData> {
+        val qLower = query.lowercase().trim()
+        val all = getAll3DComics()
+        if (qLower.isBlank() || qLower == "3d" || qLower == "3d comics" || qLower == "cg") return all
+        return all.filter { m ->
+            val title = m.attributes?.title?.values?.firstOrNull()?.lowercase().orEmpty()
+            val desc = m.attributes?.description?.values?.firstOrNull()?.lowercase().orEmpty()
+            val author = m.relationships?.firstOrNull { it.type == "author" }?.attributes?.name?.lowercase().orEmpty()
+            title.contains(qLower) || desc.contains(qLower) || author.contains(qLower)
+        }
+    }
+
     fun is3DManga(mangaId: String): Boolean {
         return mangas.any { it.id == mangaId }
     }

@@ -470,6 +470,11 @@ object ManhwaToonRepository {
         chapters
     }
 
+    fun getCachedChapterCount(mangaId: String): Int {
+        val slug = extractSlug(mangaId)
+        return chapterCache["mt_$slug"]?.size ?: chapterCache[mangaId]?.size ?: 0
+    }
+
     /**
      * Get image URLs for reading a chapter
      */
@@ -618,6 +623,8 @@ object ManhwaToonRepository {
                     el.select(".manga-title-badges, .adult").text().contains("18+") ||
                     title.contains("Uncensored", true)
 
+            val chNumStr = latestCh?.let { Regex("""(?:chapter|ch\.?)\s*(\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) }
+
             val mangaId = "mt_$slug"
             results.add(
                 MangaData(
@@ -628,7 +635,9 @@ object ManhwaToonRepository {
                         originalLanguage = "ko",
                         contentRating = if (isAdult) "pornographic" else "suggestive",
                         status = "ongoing",
-                        tags = cardTags
+                        tags = cardTags,
+                        latestUploadedChapter = latestCh,
+                        lastChapter = chNumStr
                     ),
                     relationships = listOf(
                         Relationship(
