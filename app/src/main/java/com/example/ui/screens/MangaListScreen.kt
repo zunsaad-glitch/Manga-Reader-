@@ -633,7 +633,6 @@ fun HomeScreenContent(
         if (allFreshMangas.isNotEmpty()) allFreshMangas else latestMangas.filter { !it.attributes?.status.equals("completed", ignoreCase = true) }
     }
     val mantaList by viewModel.mantaList.collectAsState()
-    val manhwaReadList by viewModel.manhwaReadList.collectAsState()
     val ecchiComicsList by viewModel.ecchiComicsList.collectAsState()
     val threeDComicsList by viewModel.threeDComicsList.collectAsState()
     val adultWebtoonsList by viewModel.adultWebtoonsList.collectAsState()
@@ -779,12 +778,11 @@ fun HomeScreenContent(
         mangas, fullColorMangas, adultWebtoonsList, matureNtrLibrary,
         ecchiComicsList, threeDComicsList, goatMangas, adultComicsList,
         parodyMangasList, manhwaCategoryList, mangaCategoryList, manhuaCategoryList,
-        comicsCategoryList, doujinshiList, manhwaToonList, mangaToonList, mantaList, manhwaReadList, selectedCategory
+        comicsCategoryList, doujinshiList, manhwaToonList, mangaToonList, mantaList, selectedCategory
     ) {
         mapOf(
             MangaCategory.ALL to mangas.size,
             MangaCategory.MANTA to (if (mantaList.isNotEmpty()) mantaList.size else 16),
-            MangaCategory.MANHWAREAD to (if (manhwaReadList.isNotEmpty()) manhwaReadList.size else 15),
             MangaCategory.MANGATOON to (if (mangaToonList.isNotEmpty()) mangaToonList.size else 12),
             MangaCategory.MANHWATOON to (if (manhwaToonList.isNotEmpty()) manhwaToonList.size else 14),
             MangaCategory.FULL_COLOR to fullColorMangas.size,
@@ -1922,7 +1920,6 @@ fun FreshReleasesSlider(
                             // API Source Tag
                             val (sourceName, sourceColor) = when {
                                 manga.id.startsWith("mta_") -> "🌊 MANTA" to Color(0xFF007AFF)
-                                manga.id.startsWith("mwr_") -> "📖 MANHWAREAD" to Color(0xFF7C4DFF)
                                 manga.id.startsWith("mto_") -> "🎨 MANGATOON" to Color(0xFFFF4081)
                                 manga.id.startsWith("mt_") -> "⚡ MANHWATOON" to Color(0xFF00B0FF)
                                 manga.id.startsWith("3d_") -> "🧊 3D COMIC" to Color(0xFF00E676)
@@ -2361,7 +2358,6 @@ fun MangaFeedCard(
                     ) {
                         val (sourceName, sourceColor) = when {
                             manga.id.startsWith("mta_") -> "MANTA" to Color(0xFF2979FF)
-                            manga.id.startsWith("mwr_") -> "MANHWAREAD" to Color(0xFF7C4DFF)
                             manga.id.startsWith("mto_") -> "MANGATOON" to Color(0xFFFF4081)
                             manga.id.startsWith("mt_") -> "MANHWATOON" to Color(0xFF00B0FF)
                             manga.id.startsWith("3d_") -> "3D COMIC" to Color(0xFF00E676)
@@ -2668,7 +2664,6 @@ fun SearchScreenContent(
                                     Text(
                                         text = when (searchSource) {
                                             SearchSource.MANTA -> "No Manta titles found for \"$searchQuery\"."
-                                            SearchSource.MANHWAREAD -> "No ManhwaRead titles found for \"$searchQuery\"."
                                             SearchSource.MANGATOON -> "No MangaToon titles found for \"$searchQuery\"."
                                             SearchSource.MANHWATOON -> "No ManhwaToon titles found for \"$searchQuery\"."
                                             else -> "No manga titles found."
@@ -2680,12 +2675,6 @@ fun SearchScreenContent(
                                         Spacer(modifier = Modifier.height(8.dp))
                                         TextButton(onClick = { viewModel.updateSearchQuery("") }) {
                                             Text("Browse All Manta", color = ThemePrimary)
-                                        }
-                                    }
-                                    if (searchSource == SearchSource.MANHWAREAD) {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        TextButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                            Text("Browse All ManhwaRead", color = ThemePrimary)
                                         }
                                     }
                                     if (searchSource == SearchSource.MANGATOON) {

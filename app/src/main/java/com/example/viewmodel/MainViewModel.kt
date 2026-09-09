@@ -34,7 +34,6 @@ enum class SearchMode {
 enum class SearchSource(val displayName: String) {
     ALL("All Sources"),
     MANTA("🌊 Manta"),
-    MANHWAREAD("📖 ManhwaRead"),
     MANGATOON("🎨 MangaToon"),
     MANHWATOON("⚡ ManhwaToon"),
     MANGADEX("MangaDex"),
@@ -49,7 +48,6 @@ enum class MangaCategory(
 ) {
     ALL("All", null),
     MANTA("🌊 Manta", listOf("ko", "en")),
-    MANHWAREAD("📖 ManhwaRead", listOf("ko", "en")),
     MANGATOON("🎨 MangaToon", listOf("en"), listOf("safe", "suggestive")),
     MANHWATOON("⚡ ManhwaToon", listOf("ko", "en"), listOf("safe", "suggestive", "erotica", "pornographic")),
     FULL_COLOR("🌈 Full Color", null, listOf("safe", "suggestive", "erotica", "pornographic"), "f5ba408b-0e7a-484d-8d49-4e9125ac96de"),
@@ -750,8 +748,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isMangaToonLoading = MutableStateFlow(false)
     val mantaList = MutableStateFlow<List<MangaData>>(emptyList())
     val isMantaLoading = MutableStateFlow(false)
-    val manhwaReadList = MutableStateFlow<List<MangaData>>(emptyList())
-    val isManhwaReadLoading = MutableStateFlow(false)
     val allFreshMangas = MutableStateFlow<List<MangaData>>(emptyList())
     val specialInterestMangas = MutableStateFlow<List<MangaData>>(emptyList())
     val cultivationGoatMangas = MutableStateFlow<List<MangaData>>(emptyList())
@@ -825,7 +821,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             fetchManhwaToon()
             fetchMangaToon()
             fetchManta()
-            fetchManhwaRead()
         }
     }
 
@@ -869,18 +864,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val curated = com.example.repository.MantaRepository.getCuratedSnapshot()
                 mantaList.value = curated
                 fetchManta()
-                curated
-            }
-            mangas.value = list
-            isLoading.value = false
-            hasMoreHome.value = false
-        } else if (category == MangaCategory.MANHWAREAD) {
-            val list = if (manhwaReadList.value.isNotEmpty()) {
-                manhwaReadList.value
-            } else {
-                val curated = com.example.repository.ManhwaReadRepository.getCuratedSnapshot()
-                manhwaReadList.value = curated
-                fetchManhwaRead()
                 curated
             }
             mangas.value = list
@@ -1547,38 +1530,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun fetchManhwaRead() {
-        viewModelScope.launch {
-            isManhwaReadLoading.value = true
-            try {
-                if (manhwaReadList.value.isEmpty()) {
-                    val snapshot = com.example.repository.ManhwaReadRepository.getCuratedSnapshot()
-                    manhwaReadList.value = snapshot
-                    if (selectedCategory.value == MangaCategory.MANHWAREAD) {
-                        mangas.value = snapshot
-                    }
-                }
-                val fresh = com.example.repository.ManhwaReadRepository.getFreshReleases()
-                if (fresh.isNotEmpty()) {
-                    manhwaReadList.value = fresh
-                    if (selectedCategory.value == MangaCategory.MANHWAREAD) {
-                        mangas.value = fresh
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error fetching ManhwaRead", e)
-            } finally {
-                isManhwaReadLoading.value = false
-                updateAllFreshMangas()
-            }
-        }
-    }
-
     fun updateAllFreshMangas() {
         val list = mutableListOf<MangaData>()
 
         val mantaFresh = mantaList.value.ifEmpty { com.example.repository.MantaRepository.getCuratedSnapshot() }
-        val manhwaReadFresh = manhwaReadList.value.ifEmpty { com.example.repository.ManhwaReadRepository.getCuratedSnapshot() }
         val mangaToonFresh = mangaToonList.value.ifEmpty { com.example.repository.MangaToonRepository.getCuratedSnapshot() }
         val manhwaToonFresh = manhwaToonList.value.ifEmpty { com.example.repository.ManhwaToonRepository.getCuratedSnapshot() }
         val threeDFresh = threeDComicsList.value.ifEmpty { com.example.repository.ThreeDComicsRepository.getAll3DComics() }
@@ -1586,7 +1541,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val maxSize = maxOf(
             mantaFresh.size,
-            manhwaReadFresh.size,
             mangaToonFresh.size,
             manhwaToonFresh.size,
             threeDFresh.size,
@@ -1594,7 +1548,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         for (i in 0 until maxSize) {
             if (i < mantaFresh.size) list.add(mantaFresh[i])
-            if (i < manhwaReadFresh.size) list.add(manhwaReadFresh[i])
             if (i < mangaToonFresh.size) list.add(mangaToonFresh[i])
             if (i < manhwaToonFresh.size) list.add(manhwaToonFresh[i])
             if (i < threeDFresh.size) list.add(threeDFresh[i])
@@ -1605,7 +1558,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 list,
                 manhwaToonRepo = com.example.repository.ManhwaToonRepository,
                 mangaToonRepo = com.example.repository.MangaToonRepository,
-                manhwaReadRepo = com.example.repository.ManhwaReadRepository,
                 mantaRepo = com.example.repository.MantaRepository,
                 threeDRepo = com.example.repository.ThreeDComicsRepository
             )
@@ -1616,7 +1568,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fetchMangaDetailJob?.cancel()
         fetchMangaDetailJob = viewModelScope.launch {
             val local = mantaList.value.find { it.id == mangaId }
-                ?: manhwaReadList.value.find { it.id == mangaId }
                 ?: mangaToonList.value.find { it.id == mangaId }
                 ?: manhwaToonList.value.find { it.id == mangaId }
                 ?: mangas.value.find { it.id == mangaId }
@@ -1650,16 +1601,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (mtaDetail != null) {
                     currentMangaDetail.value = mtaDetail
                     fetchSimilarMangas(mtaDetail)
-                    return@launch
-                }
-            }
-
-            // Scraped ManhwaRead detail check
-            if (com.example.repository.ManhwaReadRepository.isManhwaReadId(mangaId)) {
-                val mwrDetail = com.example.repository.ManhwaReadRepository.getMangaDetails(mangaId)
-                if (mwrDetail != null) {
-                    currentMangaDetail.value = mwrDetail
-                    fetchSimilarMangas(mwrDetail)
                     return@launch
                 }
             }
@@ -2524,13 +2465,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     hasMoreSearch.value = false
                     return
                 }
-                searchSource.value == SearchSource.MANHWAREAD || selectedCategory.value == MangaCategory.MANHWAREAD -> {
-                    searchMangas.value = manhwaReadList.value.ifEmpty { com.example.repository.ManhwaReadRepository.getCuratedSnapshot() }
-                    authorSearchResults.value = emptyList()
-                    isSearching.value = false
-                    hasMoreSearch.value = false
-                    return
-                }
                 searchSource.value == SearchSource.MANGATOON || selectedCategory.value == MangaCategory.MANGATOON -> {
                     searchMangas.value = mangaToonList.value.ifEmpty { com.example.repository.MangaToonRepository.getCuratedSnapshot() }
                     authorSearchResults.value = emptyList()
@@ -2585,19 +2519,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val mtaResults = com.example.repository.MantaRepository.searchManga(query)
                     searchMangas.value = mtaResults
                     hasMoreSearch.value = false
-                    isSearching.value = false
-                    return@launch
-                }
-
-                // Check if user specifically requested ManhwaRead or is in ManhwaRead tab
-                val isManhwaReadTarget = searchSource.value == SearchSource.MANHWAREAD ||
-                        selectedCategory.value == MangaCategory.MANHWAREAD ||
-                        qLower == "manhwaread" || qLower == "manhwa read"
-
-                if (isManhwaReadTarget) {
-                    val mwrResults = com.example.repository.ManhwaReadRepository.searchManga(query)
-                    searchMangas.value = mwrResults
-                    hasMoreSearch.value = mwrResults.size >= 10
                     isSearching.value = false
                     return@launch
                 }
@@ -2708,23 +2629,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                // Concurrently search all external APIs (Manta, ManhwaRead, MangaToon, ManhwaToon, 3D Comics, MangaDex, local) if in ALL sources mode and TITLE search
+                // Concurrently search all external APIs (Manta, MangaToon, ManhwaToon, 3D Comics, MangaDex, local) if in ALL sources mode and TITLE search
                 val shouldSearchManta = (searchSource.value == SearchSource.ALL || searchSource.value == SearchSource.MANTA) && searchMode.value == SearchMode.TITLE
                 val mtaDeferred: kotlinx.coroutines.Deferred<List<MangaData>>? = if (shouldSearchManta) {
                     async {
                         try {
                             com.example.repository.MantaRepository.searchManga(query)
-                        } catch (e: Exception) {
-                            emptyList<MangaData>()
-                        }
-                    }
-                } else null
-
-                val shouldSearchManhwaRead = (searchSource.value == SearchSource.ALL || searchSource.value == SearchSource.MANHWAREAD) && searchMode.value == SearchMode.TITLE
-                val mwrDeferred: kotlinx.coroutines.Deferred<List<MangaData>>? = if (shouldSearchManhwaRead) {
-                    async {
-                        try {
-                            com.example.repository.ManhwaReadRepository.searchManga(query)
                         } catch (e: Exception) {
                             emptyList<MangaData>()
                         }
@@ -2819,38 +2729,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else emptyList()
 
                 val mtaResults = mtaDeferred?.await() ?: emptyList()
-                val mwrResults = mwrDeferred?.await() ?: emptyList()
                 val mtoResults = mtoDeferred?.await() ?: emptyList()
                 val mtResults = mtDeferred?.await() ?: emptyList()
                 val dexResults = dexDeferred?.await() ?: emptyList()
                 val threeDResults = threeDDeferred?.await() ?: emptyList()
 
-                // Merge results: Manta + ManhwaRead + MangaToon + ManhwaToon + MangaDex + 3D Comics + Curated Local
-                val rawCombined = mtaResults + mwrResults + mtoResults + mtResults + dexResults + threeDResults + localMatches
+                // Merge results: Manta + MangaToon + ManhwaToon + MangaDex + 3D Comics + Curated Local
+                val rawCombined = mtaResults + mtoResults + mtResults + dexResults + threeDResults + localMatches
                 val combined = MangaDeduplicator.deduplicate(
                     rawCombined,
                     manhwaToonRepo = com.example.repository.ManhwaToonRepository,
                     mangaToonRepo = com.example.repository.MangaToonRepository,
-                    manhwaReadRepo = com.example.repository.ManhwaReadRepository,
                     mantaRepo = com.example.repository.MantaRepository,
                     threeDRepo = com.example.repository.ThreeDComicsRepository
                 )
                 searchMangas.value = combined
                 searchOffset = dexResults.size
-                hasMoreSearch.value = dexResults.size >= 30 || mtResults.size >= 10 || mtoResults.size >= 10 || mwrResults.size >= 10
+                hasMoreSearch.value = dexResults.size >= 30 || mtResults.size >= 10 || mtoResults.size >= 10
             } catch (e: Exception) {
                 e.printStackTrace()
                 // On error, check if any external repository has matching titles
                 val mtaFallback = com.example.repository.MantaRepository.searchManga(query)
-                val mwrFallback = com.example.repository.ManhwaReadRepository.searchManga(query)
                 val mtoFallback = com.example.repository.MangaToonRepository.searchManga(query)
                 val mtFallback = com.example.repository.ManhwaToonRepository.searchManga(query)
                 val threeDFallback = com.example.repository.ThreeDComicsRepository.searchManga(query)
                 val fallbackCombined = MangaDeduplicator.deduplicate(
-                    mtaFallback + mwrFallback + mtoFallback + mtFallback + threeDFallback,
+                    mtaFallback + mtoFallback + mtFallback + threeDFallback,
                     manhwaToonRepo = com.example.repository.ManhwaToonRepository,
                     mangaToonRepo = com.example.repository.MangaToonRepository,
-                    manhwaReadRepo = com.example.repository.ManhwaReadRepository,
                     mantaRepo = com.example.repository.MantaRepository,
                     threeDRepo = com.example.repository.ThreeDComicsRepository
                 )
@@ -2871,22 +2777,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isSearchingMore.value = true
             try {
-                if (searchSource.value == SearchSource.MANHWAREAD || selectedCategory.value == MangaCategory.MANHWAREAD) {
-                    val page = (searchMangas.value.size / 15) + 1
-                    val more = com.example.repository.ManhwaReadRepository.searchManga(query, page = page)
-                    if (more.isEmpty()) {
-                        hasMoreSearch.value = false
-                    } else {
-                        val currentList = searchMangas.value.toMutableList()
-                        val existingIds = currentList.map { it.id }.toSet()
-                        val filteredNew = more.filter { !existingIds.contains(it.id) }
-                        currentList.addAll(filteredNew)
-                        searchMangas.value = currentList
-                        hasMoreSearch.value = more.size >= 10
-                    }
-                    return@launch
-                }
-
                 if (searchSource.value == SearchSource.MANGATOON || selectedCategory.value == MangaCategory.MANGATOON) {
                     val page = (searchMangas.value.size / 15) + 1
                     val more = com.example.repository.MangaToonRepository.searchManga(query, page = page)
@@ -2963,13 +2853,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val additionalApiResults = mutableListOf<MangaData>()
                 if (searchSource.value == SearchSource.ALL && searchMode.value == SearchMode.TITLE) {
                     try {
-                        val mwrCount = searchMangas.value.count { it.id.startsWith("mwr_") }
-                        if (mwrCount >= 10) {
-                            val moreMwr = com.example.repository.ManhwaReadRepository.searchManga(query, page = (mwrCount / 15) + 1)
-                            additionalApiResults.addAll(moreMwr)
-                        }
-                    } catch (_: Exception) {}
-                    try {
                         val mtoCount = searchMangas.value.count { it.id.startsWith("mto_") }
                         if (mtoCount >= 10) {
                             val moreMto = com.example.repository.MangaToonRepository.searchManga(query, page = (mtoCount / 15) + 1)
@@ -2994,7 +2877,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         currentList + newResults,
                         manhwaToonRepo = com.example.repository.ManhwaToonRepository,
                         mangaToonRepo = com.example.repository.MangaToonRepository,
-                        manhwaReadRepo = com.example.repository.ManhwaReadRepository,
                         mantaRepo = com.example.repository.MantaRepository,
                         threeDRepo = com.example.repository.ThreeDComicsRepository
                     )
@@ -3086,19 +2968,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val allMta = mantaList.value.ifEmpty { com.example.repository.MantaRepository.getCuratedSnapshot() }
                 val fallback = allMta.filter { it.id != manga.id }.shuffled().take(8)
-                similarMangas.value = fallback
-                return@launch
-            }
-
-            // ManhwaRead titles: use scraped related recommendations
-            if (com.example.repository.ManhwaReadRepository.isManhwaReadId(manga.id)) {
-                val scrapedRelated = com.example.repository.ManhwaReadRepository.getRelatedMangas(manga.id)
-                if (scrapedRelated.isNotEmpty()) {
-                    similarMangas.value = scrapedRelated
-                    return@launch
-                }
-                val allMwr = manhwaReadList.value.ifEmpty { com.example.repository.ManhwaReadRepository.getCuratedSnapshot() }
-                val fallback = allMwr.filter { it.id != manga.id }.shuffled().take(8)
                 similarMangas.value = fallback
                 return@launch
             }
@@ -3244,13 +3113,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val mtaPages = com.example.repository.MantaRepository.getChapterImages(chapter.id)
                     if (mtaPages.isNotEmpty()) {
                         pagesToDownload.addAll(mtaPages)
-                    }
-                }
-
-                if (pagesToDownload.isEmpty() && com.example.repository.ManhwaReadRepository.isManhwaReadId(chapter.id)) {
-                    val mwrPages = com.example.repository.ManhwaReadRepository.getChapterImages(chapter.id)
-                    if (mwrPages.isNotEmpty()) {
-                        pagesToDownload.addAll(mwrPages)
                     }
                 }
 
@@ -3403,19 +3265,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val mtaChapters = com.example.repository.MantaRepository.getChapters(mangaId)
                     if (mtaChapters.isNotEmpty()) {
                         allRawChapters.value = mtaChapters
-                        availableLanguages.value = listOf("en")
-                        selectedChapterLanguage.value = "en"
-                        updateDisplayedChapters()
-                        isLoading.value = false
-                        return@launch
-                    }
-                }
-
-                // 1.54. Check if this is a scraped ManhwaRead manga
-                if (com.example.repository.ManhwaReadRepository.isManhwaReadId(mangaId)) {
-                    val mwrChapters = com.example.repository.ManhwaReadRepository.getChapters(mangaId)
-                    if (mwrChapters.isNotEmpty()) {
-                        allRawChapters.value = mwrChapters
                         availableLanguages.value = listOf("en")
                         selectedChapterLanguage.value = "en"
                         updateDisplayedChapters()
@@ -3664,15 +3513,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val mtaPages = com.example.repository.MantaRepository.getChapterImages(chapterId)
                     if (mtaPages.isNotEmpty()) {
                         imageUrls.value = mtaPages
-                        return@launch
-                    }
-                }
-
-                // 1.54. Check if this is a scraped ManhwaRead chapter
-                if (com.example.repository.ManhwaReadRepository.isManhwaReadId(chapterId)) {
-                    val mwrPages = com.example.repository.ManhwaReadRepository.getChapterImages(chapterId)
-                    if (mwrPages.isNotEmpty()) {
-                        imageUrls.value = mwrPages
                         return@launch
                     }
                 }

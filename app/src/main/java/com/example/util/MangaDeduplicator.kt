@@ -3,7 +3,6 @@ package com.example.util
 import com.example.api.MangaData
 import com.example.api.MangaAttributes
 import com.example.repository.MangaToonRepository
-import com.example.repository.ManhwaReadRepository
 import com.example.repository.ManhwaToonRepository
 import com.example.repository.MantaRepository
 import com.example.repository.ThreeDComicsRepository
@@ -26,7 +25,7 @@ object MangaDeduplicator {
         s = s.replace(Regex("""\[(?:official|webtoon|manhwa|manga|raw|uncensored|complete|color|scanlation|full color|18\+|adult)[^\]]*\]""", RegexOption.IGNORE_CASE), "")
 
         // Remove source suffix watermarks
-        s = s.replace(Regex("""\s*[-–—:]\s*(?:manhwatoon|mangatoon|manhwaread|manta|mangadex|webtoon)\s*$""", RegexOption.IGNORE_CASE), "")
+        s = s.replace(Regex("""\s*[-–—:]\s*(?:manhwatoon|mangatoon|manta|mangadex|webtoon)\s*$""", RegexOption.IGNORE_CASE), "")
 
         // Remove leading prefixes like 18+, HOT, RAW, NEW, ADULT
         s = s.replace(Regex("""^(?:18\+\s*|hot\s*|raw\s*|new\s*|adult\s*)+""", RegexOption.IGNORE_CASE), "")
@@ -48,7 +47,7 @@ object MangaDeduplicator {
         var s = raw.trim()
 
         // Remove trailing source branding like "- ManhwaToon", "- MangaToon", etc.
-        s = s.replace(Regex("""\s*[-–—:]\s*(?:manhwatoon|mangatoon|manhwaread|manta|mangadex|webtoon)\s*$""", RegexOption.IGNORE_CASE), "")
+        s = s.replace(Regex("""\s*[-–—:]\s*(?:manhwatoon|mangatoon|manta|mangadex|webtoon)\s*$""", RegexOption.IGNORE_CASE), "")
 
         // Remove brackets like [Uncensored], [Official], [Full Color]
         s = s.replace(Regex("""\s*\[(?:official|webtoon|manhwa|manga|raw|uncensored|complete|color|scanlation|full color|18\+|adult)[^\]]*\]""", RegexOption.IGNORE_CASE), "")
@@ -157,7 +156,6 @@ object MangaDeduplicator {
         manga: MangaData,
         manhwaToonRepo: ManhwaToonRepository? = null,
         mangaToonRepo: MangaToonRepository? = null,
-        manhwaReadRepo: ManhwaReadRepository? = null,
         mantaRepo: MantaRepository? = null,
         threeDRepo: ThreeDComicsRepository? = null
     ): Double {
@@ -183,9 +181,6 @@ object MangaDeduplicator {
                 if (count > 0) return count.toDouble()
             } else if (manga.id.startsWith("mto_") && mangaToonRepo != null) {
                 val count = mangaToonRepo.getCachedChapterCount(manga.id)
-                if (count > 0) return count.toDouble()
-            } else if (manga.id.startsWith("mwr_") && manhwaReadRepo != null) {
-                val count = manhwaReadRepo.getCachedChapterCount(manga.id)
                 if (count > 0) return count.toDouble()
             } else if (manga.id.startsWith("mta_") && mantaRepo != null) {
                 val count = mantaRepo.getCachedChapterCount(manga.id)
@@ -220,7 +215,6 @@ object MangaDeduplicator {
         mangas: List<MangaData>,
         manhwaToonRepo: ManhwaToonRepository? = null,
         mangaToonRepo: MangaToonRepository? = null,
-        manhwaReadRepo: ManhwaReadRepository? = null,
         mantaRepo: MantaRepository? = null,
         threeDRepo: ThreeDComicsRepository? = null
     ): List<MangaData> {
@@ -268,7 +262,7 @@ object MangaDeduplicator {
             // 2. Select the candidate with MAXIMUM chapter count with English title
             val winner = cluster.maxWithOrNull(
                 compareBy<MangaData> { candidate ->
-                    getChapterCount(candidate, manhwaToonRepo, mangaToonRepo, manhwaReadRepo, mantaRepo, threeDRepo)
+                    getChapterCount(candidate, manhwaToonRepo, mangaToonRepo, mantaRepo, threeDRepo)
                 }.thenBy { candidate ->
                     // Favor candidates that natively have an English title
                     if (isEnglishLike(candidate.attributes?.title?.get("en"))) 1 else 0
