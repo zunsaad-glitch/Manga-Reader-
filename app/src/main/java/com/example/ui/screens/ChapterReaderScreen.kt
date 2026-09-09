@@ -64,7 +64,7 @@ enum class ReaderMode {
 
 fun buildReaderImageRequest(context: android.content.Context, url: String, reloadKey: Int = 0): ImageRequest {
     val model: Any = when {
-        url.startsWith("file:") -> try { java.io.File(java.net.URI(url)) } catch (_: Exception) { url }
+        url.startsWith("file:") -> try { android.net.Uri.parse(url) } catch (_: Exception) { url }
         url.startsWith("/") -> java.io.File(url)
         else -> url
     }

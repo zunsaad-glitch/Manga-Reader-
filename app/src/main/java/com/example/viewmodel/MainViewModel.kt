@@ -3263,80 +3263,82 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         checkAlternativeSourcesJob?.cancel()
         checkAlternativeSourcesJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             isCheckingAlternativeSources.value = true
-            val title = currentManga.attributes?.title?.get("en")
-                ?: currentManga.attributes?.title?.values?.firstOrNull()
-                ?: run {
-                    isCheckingAlternativeSources.value = false
-                    return@launch
+            try {
+                val title = currentManga.attributes?.title?.get("en")
+                    ?: currentManga.attributes?.title?.values?.firstOrNull()
+                    ?: return@launch
+
+                val cleanCurrent = cleanTitleForMatching(title)
+                val sources = mutableListOf<AlternativeSource>()
+
+                val currentSourceName = when {
+                    com.example.repository.MantaRepository.isMantaId(currentManga.id) -> "Manta"
+                    com.example.repository.MangaToonRepository.isMangaToonId(currentManga.id) -> "MangaToon"
+                    com.example.repository.ManhwaToonRepository.isManhwaToonId(currentManga.id) -> "ManhwaToon"
+                    com.example.repository.ThreeDComicsRepository.is3DManga(currentManga.id) -> "3D Comics"
+                    else -> "MangaDex"
+                }
+                val currentChCount = allRawChapters.value.size
+                sources.add(AlternativeSource(currentSourceName, currentManga, currentChCount, isCurrent = true))
+
+                // Check Manta
+                if (currentSourceName != "Manta" && sourceMantaEnabled.value) {
+                    try {
+                        val matches = com.example.repository.MantaRepository.searchManga(title)
+                        val match = matches.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
+                        if (match != null) {
+                            val chs = com.example.repository.MantaRepository.getChapters(match.id)
+                            sources.add(AlternativeSource("Manta", match, chs.size, isCurrent = false))
+                        }
+                    } catch (_: Exception) {}
                 }
 
-            val cleanCurrent = cleanTitleForMatching(title)
-            val sources = mutableListOf<AlternativeSource>()
+                // Check MangaToon
+                if (currentSourceName != "MangaToon" && sourceMangaToonEnabled.value) {
+                    try {
+                        val matches = com.example.repository.MangaToonRepository.searchManga(title)
+                        val match = matches.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
+                        if (match != null) {
+                            val chs = com.example.repository.MangaToonRepository.getChapters(match.id)
+                            sources.add(AlternativeSource("MangaToon", match, chs.size, isCurrent = false))
+                        }
+                    } catch (_: Exception) {}
+                }
 
-            val currentSourceName = when {
-                com.example.repository.MantaRepository.isMantaId(currentManga.id) -> "Manta"
-                com.example.repository.MangaToonRepository.isMangaToonId(currentManga.id) -> "MangaToon"
-                com.example.repository.ManhwaToonRepository.isManhwaToonId(currentManga.id) -> "ManhwaToon"
-                com.example.repository.ThreeDComicsRepository.is3DManga(currentManga.id) -> "3D Comics"
-                else -> "MangaDex"
+                // Check ManhwaToon
+                if (currentSourceName != "ManhwaToon" && sourceManhwaToonEnabled.value) {
+                    try {
+                        val matches = com.example.repository.ManhwaToonRepository.searchManga(title)
+                        val match = matches.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
+                        if (match != null) {
+                            val chs = com.example.repository.ManhwaToonRepository.getChapters(match.id)
+                            sources.add(AlternativeSource("ManhwaToon", match, chs.size, isCurrent = false))
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                // Check MangaDex
+                if (currentSourceName != "MangaDex" && sourceMangaDexEnabled.value) {
+                    try {
+                        val dexResp = api.getMangaList(
+                            title = title,
+                            limit = 5,
+                            contentRatings = listOf("safe", "suggestive", "erotica", "pornographic")
+                        )
+                        val match = dexResp.data.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
+                        if (match != null) {
+                            val chResp = api.getMangaChapters(mangaId = match.id, limit = 100)
+                            sources.add(AlternativeSource("MangaDex", match, chResp.total, isCurrent = false))
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                availableSourcesForCurrentManga.value = sources
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                isCheckingAlternativeSources.value = false
             }
-            val currentChCount = allRawChapters.value.size
-            sources.add(AlternativeSource(currentSourceName, currentManga, currentChCount, isCurrent = true))
-
-            // Check Manta
-            if (currentSourceName != "Manta" && sourceMantaEnabled.value) {
-                try {
-                    val matches = com.example.repository.MantaRepository.searchManga(title)
-                    val match = matches.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
-                    if (match != null) {
-                        val chs = com.example.repository.MantaRepository.getChapters(match.id)
-                        sources.add(AlternativeSource("Manta", match, chs.size, isCurrent = false))
-                    }
-                } catch (_: Exception) {}
-            }
-
-            // Check MangaToon
-            if (currentSourceName != "MangaToon" && sourceMangaToonEnabled.value) {
-                try {
-                    val matches = com.example.repository.MangaToonRepository.searchManga(title)
-                    val match = matches.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
-                    if (match != null) {
-                        val chs = com.example.repository.MangaToonRepository.getChapters(match.id)
-                        sources.add(AlternativeSource("MangaToon", match, chs.size, isCurrent = false))
-                    }
-                } catch (_: Exception) {}
-            }
-
-            // Check ManhwaToon
-            if (currentSourceName != "ManhwaToon" && sourceManhwaToonEnabled.value) {
-                try {
-                    val matches = com.example.repository.ManhwaToonRepository.searchManga(title)
-                    val match = matches.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
-                    if (match != null) {
-                        val chs = com.example.repository.ManhwaToonRepository.getChapters(match.id)
-                        sources.add(AlternativeSource("ManhwaToon", match, chs.size, isCurrent = false))
-                    }
-                } catch (_: Exception) {}
-            }
-
-            // Check MangaDex
-            if (currentSourceName != "MangaDex" && sourceMangaDexEnabled.value) {
-                try {
-                    val dexResp = api.getMangaList(
-                        title = title,
-                        limit = 5,
-                        contentRatings = listOf("safe", "suggestive", "erotica", "pornographic")
-                    )
-                    val match = dexResp.data.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
-                    if (match != null) {
-                        val chResp = api.getMangaChapters(mangaId = match.id, limit = 100)
-                        sources.add(AlternativeSource("MangaDex", match, chResp.total, isCurrent = false))
-                    }
-                } catch (_: Exception) {}
-            }
-
-            availableSourcesForCurrentManga.value = sources
-            isCheckingAlternativeSources.value = false
         }
     }
 
