@@ -63,8 +63,13 @@ enum class ReaderMode {
 }
 
 fun buildReaderImageRequest(context: android.content.Context, url: String, reloadKey: Int = 0): ImageRequest {
+    val model: Any = when {
+        url.startsWith("file:") -> try { java.io.File(java.net.URI(url)) } catch (_: Exception) { url }
+        url.startsWith("/") -> java.io.File(url)
+        else -> url
+    }
     val builder = ImageRequest.Builder(context)
-        .data(url)
+        .data(model)
         .crossfade(true)
     if (reloadKey > 0) {
         builder.memoryCachePolicy(coil.request.CachePolicy.WRITE_ONLY)
@@ -138,7 +143,8 @@ fun ChapterReaderScreen(
 
     val downloadedChapterIds by viewModel.downloadedChapterIds.collectAsState()
     val isOfflineChapter = remember(currentChapterId, downloadedChapterIds, imageUrls) {
-        downloadedChapterIds.contains(currentChapterId) || imageUrls.firstOrNull()?.startsWith("file://") == true
+        downloadedChapterIds.contains(currentChapterId) || 
+        imageUrls.firstOrNull()?.let { it.startsWith("file:") || it.startsWith("/") } == true
     }
 
     val currentIndex = remember(chapters, currentChapterId) {

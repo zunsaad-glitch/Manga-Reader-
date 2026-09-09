@@ -179,6 +179,8 @@ fun ChapterListScreen(
     val downloadedChapterIds by viewModel.downloadedChapterIds.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
     val downloadingChapterId by viewModel.downloadingChapterId.collectAsState()
+    val availableSources by viewModel.availableSourcesForCurrentManga.collectAsState()
+    val isCheckingSources by viewModel.isCheckingAlternativeSources.collectAsState()
 
     LaunchedEffect(mangaId) {
         viewModel.fetchMangaDetail(mangaId)
@@ -681,6 +683,87 @@ fun ChapterListScreen(
                 // Controls, Language Tabs & Search Bar
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        // Alternative Sources Switcher
+                        if (availableSources.size > 1 || isCheckingSources) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = ThemeSurfaceVariant.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, ThemeOutline.copy(alpha = 0.2f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "🌐 SOURCES & MIRRORS",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 0.8.sp,
+                                                color = ThemeSecondary
+                                            )
+                                        )
+                                        if (isCheckingSources) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(14.dp),
+                                                strokeWidth = 2.dp,
+                                                color = ThemeSecondary
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 2.dp)
+                                    ) {
+                                        items(availableSources) { src ->
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (src.isCurrent) ThemePrimary else ThemeSurface,
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    if (src.isCurrent) ThemePrimary else ThemeOutline.copy(alpha = 0.3f)
+                                                ),
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clickable {
+                                                        if (!src.isCurrent) {
+                                                            viewModel.switchToSource(src.manga)
+                                                        }
+                                                    }
+                                                    .testTag("source_switch_${src.sourceName.lowercase()}")
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = src.sourceName,
+                                                        style = MaterialTheme.typography.labelSmall.copy(
+                                                            fontWeight = if (src.isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                                            color = if (src.isCurrent) Color.Black else Color.White
+                                                        )
+                                                    )
+                                                    if (src.chapterCount > 0) {
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = "(${src.chapterCount})",
+                                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                                fontSize = 10.sp,
+                                                                color = if (src.isCurrent) Color.Black.copy(alpha = 0.7f) else ThemeOnSurfaceVariant
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,

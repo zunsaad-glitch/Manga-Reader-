@@ -45,6 +45,11 @@ fun SettingsScreen(
     val totalMinutes by viewModel.totalReadingMinutes.collectAsState()
     val actionRumbleEnabled by viewModel.actionRumbleEnabled.collectAsState()
     val readerExp by viewModel.readerExp.collectAsState()
+    val sourceMangaDexEnabled by viewModel.settingsRepository.sourceMangaDexEnabled.collectAsState(initial = true)
+    val sourceMantaEnabled by viewModel.settingsRepository.sourceMantaEnabled.collectAsState(initial = true)
+    val sourceMangaToonEnabled by viewModel.settingsRepository.sourceMangaToonEnabled.collectAsState(initial = true)
+    val sourceManhwaToonEnabled by viewModel.settingsRepository.sourceManhwaToonEnabled.collectAsState(initial = true)
+    val source3dEnabled by viewModel.settingsRepository.source3dEnabled.collectAsState(initial = true)
 
     var isClearingCache by remember { mutableStateOf(false) }
     var showInsightsSheet by remember { mutableStateOf(false) }
@@ -302,7 +307,134 @@ fun SettingsScreen(
                 }
             }
 
-            // === 5. STORAGE & CACHE ===
+            // === 5. CONTENT SOURCES & PROVIDER MANAGEMENT ===
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth().testTag("settings_sources_card")
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Hub, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "CONTENT SOURCES & PROVIDERS",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Enable or disable individual providers to customize discovery and search",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    SettingsRowItem(
+                        icon = Icons.Filled.Language,
+                        title = "MangaDex",
+                        subtitle = "Official scanlations & multi-language chapters",
+                        trailing = {
+                            Switch(
+                                checked = sourceMangaDexEnabled,
+                                onCheckedChange = {
+                                    scope.launch {
+                                        viewModel.settingsRepository.setSourceEnabled(com.example.data.SettingsRepository.SOURCE_MANGADEX_ENABLED, it)
+                                        viewModel.updateAllFreshMangas()
+                                    }
+                                },
+                                modifier = Modifier.testTag("source_mangadex_switch")
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+
+                    SettingsRowItem(
+                        icon = Icons.Filled.WaterDrop,
+                        title = "Manta Webcomics",
+                        subtitle = "Korean manhwa, romance & full-color webcomics",
+                        trailing = {
+                            Switch(
+                                checked = sourceMantaEnabled,
+                                onCheckedChange = {
+                                    scope.launch {
+                                        viewModel.settingsRepository.setSourceEnabled(com.example.data.SettingsRepository.SOURCE_MANTA_ENABLED, it)
+                                        viewModel.updateAllFreshMangas()
+                                    }
+                                },
+                                modifier = Modifier.testTag("source_manta_switch")
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+
+                    SettingsRowItem(
+                        icon = Icons.Filled.Palette,
+                        title = "MangaToon",
+                        subtitle = "English licensed webcomics & diverse categories",
+                        trailing = {
+                            Switch(
+                                checked = sourceMangaToonEnabled,
+                                onCheckedChange = {
+                                    scope.launch {
+                                        viewModel.settingsRepository.setSourceEnabled(com.example.data.SettingsRepository.SOURCE_MANGATOON_ENABLED, it)
+                                        viewModel.updateAllFreshMangas()
+                                    }
+                                },
+                                modifier = Modifier.testTag("source_mangatoon_switch")
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+
+                    SettingsRowItem(
+                        icon = Icons.Filled.Bolt,
+                        title = "ManhwaToon",
+                        subtitle = "Cultivation, reincarnation & action series",
+                        trailing = {
+                            Switch(
+                                checked = sourceManhwaToonEnabled,
+                                onCheckedChange = {
+                                    scope.launch {
+                                        viewModel.settingsRepository.setSourceEnabled(com.example.data.SettingsRepository.SOURCE_MANHWATOON_ENABLED, it)
+                                        viewModel.updateAllFreshMangas()
+                                    }
+                                },
+                                modifier = Modifier.testTag("source_manhwatoon_switch")
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+
+                    SettingsRowItem(
+                        icon = Icons.Filled.ViewInAr,
+                        title = "3D Comics & Mature",
+                        subtitle = "High-definition 3D renders & graphic novels",
+                        trailing = {
+                            Switch(
+                                checked = source3dEnabled,
+                                onCheckedChange = {
+                                    scope.launch {
+                                        viewModel.settingsRepository.setSourceEnabled(com.example.data.SettingsRepository.SOURCE_3D_ENABLED, it)
+                                        viewModel.updateAllFreshMangas()
+                                    }
+                                },
+                                modifier = Modifier.testTag("source_3d_switch")
+                            )
+                        }
+                    )
+                }
+            }
+
+            // === 6. STORAGE & CACHE ===
             Card(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),

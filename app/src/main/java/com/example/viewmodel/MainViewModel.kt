@@ -79,6 +79,13 @@ enum class LibraryFilter(val displayName: String) {
     OFFLINE("Offline Downloads")
 }
 
+data class AlternativeSource(
+    val sourceName: String,
+    val manga: MangaData,
+    val chapterCount: Int,
+    val isCurrent: Boolean
+)
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     val settingsRepository = SettingsRepository(application)
     private val appDatabase = AppDatabase.getDatabase(application)
@@ -262,6 +269,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val includedTags = settingsRepository.includedTags.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
     val minChapterCount = settingsRepository.minChapterCount.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
     val statusFilter = settingsRepository.statusFilter.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "ALL")
+    val sourceMangaDexEnabled = settingsRepository.sourceMangaDexEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val sourceMantaEnabled = settingsRepository.sourceMantaEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val sourceMangaToonEnabled = settingsRepository.sourceMangaToonEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val sourceManhwaToonEnabled = settingsRepository.sourceManhwaToonEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val source3dEnabled = settingsRepository.source3dEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val availableSourcesForCurrentManga = MutableStateFlow<List<AlternativeSource>>(emptyList())
+    val isCheckingAlternativeSources = MutableStateFlow(false)
 
     // Panel Bookmarks parsed
     val panelBookmarks = MutableStateFlow<List<PanelBookmark>>(emptyList())
@@ -1593,6 +1608,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentMangaDetail.value = local
             if (local != null) {
                 fetchSimilarMangas(local)
+                checkAlternativeSources(local)
             }
 
             // Scraped Manta detail check
@@ -1601,6 +1617,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (mtaDetail != null) {
                     currentMangaDetail.value = mtaDetail
                     fetchSimilarMangas(mtaDetail)
+                    checkAlternativeSources(mtaDetail)
                     return@launch
                 }
             }
@@ -1611,6 +1628,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (mtoDetail != null) {
                     currentMangaDetail.value = mtoDetail
                     fetchSimilarMangas(mtoDetail)
+                    checkAlternativeSources(mtoDetail)
                     return@launch
                 }
             }
@@ -1621,6 +1639,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (mtDetail != null) {
                     currentMangaDetail.value = mtDetail
                     fetchSimilarMangas(mtDetail)
+                    checkAlternativeSources(mtDetail)
                     return@launch
                 }
             }
@@ -1630,10 +1649,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (response.data != null) {
                     currentMangaDetail.value = response.data
                     fetchSimilarMangas(response.data)
+                    checkAlternativeSources(response.data)
                 }
             } catch (e: Exception) {
                 if (local != null) {
                     fetchSimilarMangas(local)
+                    checkAlternativeSources(local)
                 }
             }
         }
@@ -3103,95 +3124,103 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private suspend fun downloadChapterInternal(manga: MangaData, chapter: ChapterData) {
+        downloadingChapterId.value = chapter.id
+        try {
+            // If we don't have images yet, fetch them
+            val pagesToDownload = mutableListOf<String>()
+            if (com.example.repository.MantaRepository.isMantaId(chapter.id)) {
+                val mtaPages = com.example.repository.MantaRepository.getChapterImages(chapter.id)
+                if (mtaPages.isNotEmpty()) {
+                    pagesToDownload.addAll(mtaPages)
+                }
+            }
+
+            if (pagesToDownload.isEmpty() && com.example.repository.MangaToonRepository.isMangaToonId(chapter.id)) {
+                val mtoPages = com.example.repository.MangaToonRepository.getChapterImages(chapter.id)
+                if (mtoPages.isNotEmpty()) {
+                    pagesToDownload.addAll(mtoPages)
+                }
+            }
+
+            if (pagesToDownload.isEmpty() && com.example.repository.ManhwaToonRepository.isManhwaToonId(chapter.id)) {
+                val mtPages = com.example.repository.ManhwaToonRepository.getChapterImages(chapter.id)
+                if (mtPages.isNotEmpty()) {
+                    pagesToDownload.addAll(mtPages)
+                }
+            }
+
+            if (pagesToDownload.isEmpty() && com.example.repository.ThreeDComicsRepository.is3DChapter(chapter.id)) {
+                val threeDPages = com.example.repository.ThreeDComicsRepository.getPageUrlsForChapter(chapter.id)
+                if (!threeDPages.isNullOrEmpty()) {
+                    pagesToDownload.addAll(threeDPages)
+                }
+            }
+
+            if (pagesToDownload.isEmpty() && (chapter.id.startsWith("janda_") || chapter.id.startsWith("pururin_") || 
+                chapter.id.startsWith("hfox_") || chapter.id.startsWith("3h_") || 
+                chapter.id.startsWith("nh_") || chapter.id.startsWith("3d_") ||
+                chapter.id.startsWith("cg_") || chapter.id.startsWith("comic_") ||
+                chapter.id.startsWith("fb_") || (chapter.id.all { it.isDigit() } && chapter.id.length in 5..8))) {
+                val cleanId = chapter.id.removePrefix("janda_")
+                val detail = jandaRepository.getDetail("all", cleanId)
+                if (detail != null && detail.pages.isNotEmpty()) {
+                    pagesToDownload.addAll(detail.pages)
+                }
+            }
+
+            if (pagesToDownload.isEmpty()) {
+                try {
+                    val response = api.getChapterServer(chapter.id)
+                    val baseUrl = response.baseUrl
+                    val chapterNode = response.chapter
+                    if (chapterNode != null && chapterNode.hash.isNotBlank()) {
+                        val hash = chapterNode.hash
+                        val data = if (!chapterNode.data.isNullOrEmpty()) chapterNode.data else (chapterNode.dataSaver ?: emptyList())
+                        pagesToDownload.addAll(data.map { fileName ->
+                            if (chapterNode.data.isNullOrEmpty() && chapterNode.dataSaver != null) {
+                                "$baseUrl/data-saver/$hash/$fileName"
+                            } else {
+                                "$baseUrl/data/$hash/$fileName"
+                            }
+                        })
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            if (pagesToDownload.isNotEmpty()) {
+                offlineRepository.saveChapterForOffline(
+                    manga = manga,
+                    chapter = chapter,
+                    imageUrls = pagesToDownload,
+                    onProgress = { current, total ->
+                        val prog = current.toFloat() / total.toFloat()
+                        downloadProgress.value = downloadProgress.value + (chapter.id to prog)
+                    }
+                )
+            }
+        } finally {
+            downloadingChapterId.value = null
+            downloadProgress.value = downloadProgress.value - chapter.id
+        }
+    }
+
     fun downloadChapter(manga: MangaData, chapter: ChapterData) {
         viewModelScope.launch {
-            downloadingChapterId.value = chapter.id
-            try {
-                // If we don't have images yet, fetch them
-                val pagesToDownload = mutableListOf<String>()
-                if (com.example.repository.MantaRepository.isMantaId(chapter.id)) {
-                    val mtaPages = com.example.repository.MantaRepository.getChapterImages(chapter.id)
-                    if (mtaPages.isNotEmpty()) {
-                        pagesToDownload.addAll(mtaPages)
-                    }
-                }
-
-                if (pagesToDownload.isEmpty() && com.example.repository.MangaToonRepository.isMangaToonId(chapter.id)) {
-                    val mtoPages = com.example.repository.MangaToonRepository.getChapterImages(chapter.id)
-                    if (mtoPages.isNotEmpty()) {
-                        pagesToDownload.addAll(mtoPages)
-                    }
-                }
-
-                if (pagesToDownload.isEmpty() && com.example.repository.ManhwaToonRepository.isManhwaToonId(chapter.id)) {
-                    val mtPages = com.example.repository.ManhwaToonRepository.getChapterImages(chapter.id)
-                    if (mtPages.isNotEmpty()) {
-                        pagesToDownload.addAll(mtPages)
-                    }
-                }
-
-                if (pagesToDownload.isEmpty() && com.example.repository.ThreeDComicsRepository.is3DChapter(chapter.id)) {
-                    val threeDPages = com.example.repository.ThreeDComicsRepository.getPageUrlsForChapter(chapter.id)
-                    if (!threeDPages.isNullOrEmpty()) {
-                        pagesToDownload.addAll(threeDPages)
-                    }
-                }
-
-                if (pagesToDownload.isEmpty() && (chapter.id.startsWith("janda_") || chapter.id.startsWith("pururin_") || 
-                    chapter.id.startsWith("hfox_") || chapter.id.startsWith("3h_") || 
-                    chapter.id.startsWith("nh_") || chapter.id.startsWith("3d_") ||
-                    chapter.id.startsWith("cg_") || chapter.id.startsWith("comic_") ||
-                    chapter.id.startsWith("fb_") || (chapter.id.all { it.isDigit() } && chapter.id.length in 5..8))) {
-                    val cleanId = chapter.id.removePrefix("janda_")
-                    val detail = jandaRepository.getDetail("all", cleanId)
-                    if (detail != null && detail.pages.isNotEmpty()) {
-                        pagesToDownload.addAll(detail.pages)
-                    }
-                }
-
-                if (pagesToDownload.isEmpty()) {
-                    try {
-                        val response = api.getChapterServer(chapter.id)
-                        val baseUrl = response.baseUrl
-                        val chapterNode = response.chapter
-                        if (chapterNode != null && chapterNode.hash.isNotBlank()) {
-                            val hash = chapterNode.hash
-                            val data = if (!chapterNode.data.isNullOrEmpty()) chapterNode.data else (chapterNode.dataSaver ?: emptyList())
-                            pagesToDownload.addAll(data.map { fileName ->
-                                if (chapterNode.data.isNullOrEmpty() && chapterNode.dataSaver != null) {
-                                    "$baseUrl/data-saver/$hash/$fileName"
-                                } else {
-                                    "$baseUrl/data/$hash/$fileName"
-                                }
-                            })
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-
-                if (pagesToDownload.isNotEmpty()) {
-                    offlineRepository.saveChapterForOffline(
-                        manga = manga,
-                        chapter = chapter,
-                        imageUrls = pagesToDownload,
-                        onProgress = { current, total ->
-                            val prog = current.toFloat() / total.toFloat()
-                            downloadProgress.value = downloadProgress.value + (chapter.id to prog)
-                        }
-                    )
-                }
-            } finally {
-                downloadingChapterId.value = null
-                downloadProgress.value = downloadProgress.value - chapter.id
-            }
+            downloadChapterInternal(manga, chapter)
         }
     }
 
     fun downloadAllChapters(manga: MangaData, chaptersList: List<ChapterData>) {
         viewModelScope.launch {
-            for (chapter in chaptersList) {
-                downloadChapter(manga, chapter)
+            val toDownload = chaptersList.filter { ch ->
+                !downloadedChapterIds.value.contains(ch.id) &&
+                ((ch.attributes?.pages ?: 0) > 0 || !ch.attributes?.externalUrl.isNullOrBlank())
+            }
+            for (chapter in toDownload) {
+                downloadChapterInternal(manga, chapter)
             }
         }
     }
@@ -3210,7 +3239,114 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val chaptersCache = java.util.concurrent.ConcurrentHashMap<String, List<ChapterData>>()
+    private val chapterImagesCache = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
     private var fetchChaptersJob: kotlinx.coroutines.Job? = null
+    private var checkAlternativeSourcesJob: kotlinx.coroutines.Job? = null
+
+    private fun cleanTitleForMatching(title: String): String {
+        return title.lowercase()
+            .replace(Regex("[^a-z0-9]"), "")
+            .trim()
+    }
+
+    private fun isTitleMatch(t1: String, t2: String): Boolean {
+        if (t1.isEmpty() || t2.isEmpty()) return false
+        if (t1 == t2) return true
+        if (t1.length >= 4 && t2.length >= 4) {
+            return t1.contains(t2) || t2.contains(t1)
+        }
+        return false
+    }
+
+    fun checkAlternativeSources(currentManga: MangaData) {
+        checkAlternativeSourcesJob?.cancel()
+        checkAlternativeSourcesJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            isCheckingAlternativeSources.value = true
+            val title = currentManga.attributes?.title?.get("en")
+                ?: currentManga.attributes?.title?.values?.firstOrNull()
+                ?: run {
+                    isCheckingAlternativeSources.value = false
+                    return@launch
+                }
+
+            val cleanCurrent = cleanTitleForMatching(title)
+            val sources = mutableListOf<AlternativeSource>()
+
+            val currentSourceName = when {
+                com.example.repository.MantaRepository.isMantaId(currentManga.id) -> "Manta"
+                com.example.repository.MangaToonRepository.isMangaToonId(currentManga.id) -> "MangaToon"
+                com.example.repository.ManhwaToonRepository.isManhwaToonId(currentManga.id) -> "ManhwaToon"
+                com.example.repository.ThreeDComicsRepository.is3DManga(currentManga.id) -> "3D Comics"
+                else -> "MangaDex"
+            }
+            val currentChCount = allRawChapters.value.size
+            sources.add(AlternativeSource(currentSourceName, currentManga, currentChCount, isCurrent = true))
+
+            // Check Manta
+            if (currentSourceName != "Manta" && sourceMantaEnabled.value) {
+                try {
+                    val matches = com.example.repository.MantaRepository.searchManga(title)
+                    val match = matches.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
+                    if (match != null) {
+                        val chs = com.example.repository.MantaRepository.getChapters(match.id)
+                        sources.add(AlternativeSource("Manta", match, chs.size, isCurrent = false))
+                    }
+                } catch (_: Exception) {}
+            }
+
+            // Check MangaToon
+            if (currentSourceName != "MangaToon" && sourceMangaToonEnabled.value) {
+                try {
+                    val matches = com.example.repository.MangaToonRepository.searchManga(title)
+                    val match = matches.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
+                    if (match != null) {
+                        val chs = com.example.repository.MangaToonRepository.getChapters(match.id)
+                        sources.add(AlternativeSource("MangaToon", match, chs.size, isCurrent = false))
+                    }
+                } catch (_: Exception) {}
+            }
+
+            // Check ManhwaToon
+            if (currentSourceName != "ManhwaToon" && sourceManhwaToonEnabled.value) {
+                try {
+                    val matches = com.example.repository.ManhwaToonRepository.searchManga(title)
+                    val match = matches.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
+                    if (match != null) {
+                        val chs = com.example.repository.ManhwaToonRepository.getChapters(match.id)
+                        sources.add(AlternativeSource("ManhwaToon", match, chs.size, isCurrent = false))
+                    }
+                } catch (_: Exception) {}
+            }
+
+            // Check MangaDex
+            if (currentSourceName != "MangaDex" && sourceMangaDexEnabled.value) {
+                try {
+                    val dexResp = api.getMangaList(
+                        title = title,
+                        limit = 5,
+                        contentRatings = listOf("safe", "suggestive", "erotica", "pornographic")
+                    )
+                    val match = dexResp.data.firstOrNull { isTitleMatch(cleanCurrent, cleanTitleForMatching(it.attributes?.title?.values?.firstOrNull().orEmpty())) }
+                    if (match != null) {
+                        val chResp = api.getMangaChapters(mangaId = match.id, limit = 100)
+                        sources.add(AlternativeSource("MangaDex", match, chResp.total, isCurrent = false))
+                    }
+                } catch (_: Exception) {}
+            }
+
+            availableSourcesForCurrentManga.value = sources
+            isCheckingAlternativeSources.value = false
+        }
+    }
+
+    fun switchToSource(altManga: MangaData) {
+        currentMangaDetail.value = altManga
+        fetchChapters(altManga.id)
+        availableSourcesForCurrentManga.value = availableSourcesForCurrentManga.value.map {
+            it.copy(isCurrent = it.manga.id == altManga.id)
+        }
+    }
 
     fun fetchChapters(mangaId: String) {
         fetchChaptersJob?.cancel()
@@ -3221,36 +3357,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             allRawChapters.value = emptyList()
             availableLanguages.value = emptyList()
 
-            try {
-                // 1. Check if we have offline chapters saved in Room database
-                val offlineChs = offlineRepository.getOfflineChapters(mangaId).stateIn(viewModelScope).value
-                if (offlineChs.isNotEmpty()) {
-                    val offChapters = offlineChs.map { off ->
-                        ChapterData(
-                            id = off.chapterId,
-                            type = "chapter",
-                            attributes = ChapterAttributes(
-                                volume = "1",
-                                chapter = off.chapterNumber,
-                                title = off.title,
-                                translatedLanguage = "en",
-                                pages = off.pageCount,
-                                publishAt = "2024-01-01T00:00:00+00:00"
-                            )
-                        )
-                    }
-                    allRawChapters.value = offChapters
-                    availableLanguages.value = listOf("en")
-                    selectedChapterLanguage.value = "en"
-                    updateDisplayedChapters()
-                    isLoading.value = false
-                    return@launch
+            // 0. Check in-memory cache for INSTANT 0ms load!
+            val cached = chaptersCache[mangaId]
+            if (!cached.isNullOrEmpty()) {
+                allRawChapters.value = cached
+                val langs = cached.mapNotNull { it.attributes?.translatedLanguage?.lowercase() }.distinct()
+                availableLanguages.value = if (langs.isNotEmpty()) langs else listOf("en")
+                if (!langs.contains(selectedChapterLanguage.value) && langs.isNotEmpty()) {
+                    selectedChapterLanguage.value = if (langs.contains("en")) "en" else langs.first()
                 }
+                updateDisplayedChapters()
+                isLoading.value = false
+                return@launch
+            }
 
-                // 1.5. Check if this is a curated 3D comic manga with full multi-chapter series
+            try {
+                // 1. Check if this is a curated 3D comic manga with full multi-chapter series
                 if (com.example.repository.ThreeDComicsRepository.is3DManga(mangaId)) {
                     val threeDChapters = com.example.repository.ThreeDComicsRepository.getChaptersForManga(mangaId)
                     if (!threeDChapters.isNullOrEmpty()) {
+                        chaptersCache[mangaId] = threeDChapters
                         allRawChapters.value = threeDChapters
                         availableLanguages.value = listOf("en")
                         selectedChapterLanguage.value = "en"
@@ -3264,6 +3390,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (com.example.repository.MantaRepository.isMantaId(mangaId)) {
                     val mtaChapters = com.example.repository.MantaRepository.getChapters(mangaId)
                     if (mtaChapters.isNotEmpty()) {
+                        chaptersCache[mangaId] = mtaChapters
                         allRawChapters.value = mtaChapters
                         availableLanguages.value = listOf("en")
                         selectedChapterLanguage.value = "en"
@@ -3277,6 +3404,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (com.example.repository.MangaToonRepository.isMangaToonId(mangaId)) {
                     val mtoChapters = com.example.repository.MangaToonRepository.getChapters(mangaId)
                     if (mtoChapters.isNotEmpty()) {
+                        chaptersCache[mangaId] = mtoChapters
                         allRawChapters.value = mtoChapters
                         availableLanguages.value = listOf("en")
                         selectedChapterLanguage.value = "en"
@@ -3290,6 +3418,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (com.example.repository.ManhwaToonRepository.isManhwaToonId(mangaId)) {
                     val mtChapters = com.example.repository.ManhwaToonRepository.getChapters(mangaId)
                     if (mtChapters.isNotEmpty()) {
+                        chaptersCache[mangaId] = mtChapters
                         allRawChapters.value = mtChapters
                         availableLanguages.value = listOf("en")
                         selectedChapterLanguage.value = "en"
@@ -3330,7 +3459,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     publishAt = "2024-01-01T00:00:00+00:00"
                                 )
                             )
-                            allRawChapters.value = listOf(gChapter)
+                            val list = listOf(gChapter)
+                            chaptersCache[mangaId] = list
+                            allRawChapters.value = list
                             availableLanguages.value = listOf("en")
                             selectedChapterLanguage.value = "en"
                             updateDisplayedChapters()
@@ -3354,7 +3485,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 publishAt = "2024-01-01T00:00:00+00:00"
                             )
                         )
-                        allRawChapters.value = listOf(gChapter)
+                        val list = listOf(gChapter)
+                        chaptersCache[mangaId] = list
+                        allRawChapters.value = list
                         availableLanguages.value = listOf("en")
                         selectedChapterLanguage.value = "en"
                         updateDisplayedChapters()
@@ -3369,31 +3502,67 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mangaId
                 }
 
-                // 3. Fetch all chapters from MangaDex API with complete pagination
-                val allChapters = mutableListOf<ChapterData>()
-                var offset = 0
-                val limit = 100
-                var total = 0
+                // 3. Fast MangaDex API fetch:
+                // Step A: Load first 100 chapters immediately and render without delay!
+                val firstBatch = api.getMangaChapters(
+                    mangaId = effectiveMangaId,
+                    translatedLanguage = null,
+                    contentRatings = listOf("safe", "suggestive", "erotica", "pornographic"),
+                    order = "asc",
+                    limit = 100,
+                    offset = 0
+                )
 
-                try {
-                    do {
-                        val response = api.getMangaChapters(
-                            mangaId = effectiveMangaId,
-                            translatedLanguage = null,
-                            contentRatings = listOf("safe", "suggestive", "erotica", "pornographic"),
-                            order = "asc",
-                            limit = limit,
-                            offset = offset
-                        )
-                        allChapters.addAll(response.data)
-                        total = response.total
-                        offset += limit
-                    } while (allChapters.size < total && response.data.isNotEmpty() && offset < 4000)
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                val allChapters = java.util.concurrent.CopyOnWriteArrayList<ChapterData>()
+                allChapters.addAll(firstBatch.data)
+                val total = firstBatch.total
+
+                // Step B: If first batch returned chapters, update UI right away!
+                if (firstBatch.data.isNotEmpty()) {
+                    val initialValid = firstBatch.data.filter { (it.attributes?.pages ?: 0) > 0 || !it.attributes?.externalUrl.isNullOrBlank() }
+                    if (initialValid.isNotEmpty()) {
+                        allRawChapters.value = initialValid
+                        val langs = initialValid.mapNotNull { it.attributes?.translatedLanguage?.lowercase() }.distinct()
+                        if (langs.isNotEmpty()) {
+                            availableLanguages.value = langs
+                            if (!langs.contains(selectedChapterLanguage.value)) {
+                                selectedChapterLanguage.value = if (langs.contains("en")) "en" else langs.first()
+                            }
+                        }
+                        updateDisplayedChapters()
+                        isLoading.value = false // Stop spinner immediately!
+                    }
                 }
 
-                // If no internal chapters returned, also query external chapters (e.g. MangaPlus)
+                // Step C: If there are additional chapters beyond 100, fetch in parallel
+                if (total > 100) {
+                    val maxChaptersToFetch = minOf(total, 1200)
+                    val offsets = (100 until maxChaptersToFetch step 100).toList()
+
+                    kotlinx.coroutines.coroutineScope {
+                        val deferreds = offsets.map { off ->
+                            async(kotlinx.coroutines.Dispatchers.IO) {
+                                try {
+                                    api.getMangaChapters(
+                                        mangaId = effectiveMangaId,
+                                        translatedLanguage = null,
+                                        contentRatings = listOf("safe", "suggestive", "erotica", "pornographic"),
+                                        order = "asc",
+                                        limit = 100,
+                                        offset = off
+                                    ).data
+                                } catch (e: Exception) {
+                                    emptyList<ChapterData>()
+                                }
+                            }
+                        }
+                        deferreds.forEach { deferred ->
+                            allChapters.addAll(deferred.await())
+                        }
+                    }
+                }
+
+                // If no internal chapters returned, query external chapters
                 if (allChapters.isEmpty()) {
                     try {
                         val response = api.getMangaChapters(
@@ -3401,7 +3570,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             translatedLanguage = null,
                             contentRatings = listOf("safe", "suggestive", "erotica", "pornographic"),
                             order = "asc",
-                            limit = limit,
+                            limit = 100,
                             offset = 0,
                             includeExternalUrl = 1
                         )
@@ -3411,12 +3580,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                // 4. Filter out empty invalid chapters
+                // 4. Filter valid chapters
                 var validChapters = allChapters.filter { ch ->
                     (ch.attributes?.pages ?: 0) > 0 || !ch.attributes?.externalUrl.isNullOrBlank()
-                }
+                }.distinctBy { it.id }
 
-                // If MangaDex has 0 uploaded scanlations (e.g. 3D comics, graphic novels, licensed webcomics)
+                // Fallback for 0 scanlations
                 if (validChapters.isEmpty()) {
                     val resolvedTitle = currentMangaDetail.value?.attributes?.title?.values?.firstOrNull()
                         ?: threeDComicsList.value.find { it.id == mangaId }?.attributes?.title?.values?.firstOrNull()
@@ -3439,7 +3608,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     validChapters = listOf(fallbackChapter)
                 }
 
-                // 5. Deduplicate chapters PER LANGUAGE so translations don't collide or knock each other out
+                // Deduplicate chapters PER LANGUAGE
                 val dedupedList = validChapters
                     .groupBy { ch ->
                         val lang = ch.attributes?.translatedLanguage?.lowercase() ?: "en"
@@ -3454,9 +3623,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         } ?: group.first()
                     }
 
+                chaptersCache[mangaId] = dedupedList
                 allRawChapters.value = dedupedList
 
-                // 6. Identify available languages
                 val langCounts = dedupedList.groupBy { it.attributes?.translatedLanguage?.lowercase() ?: "unknown" }
                     .mapValues { it.value.size }
                 val sortedLangs = langCounts.keys.sortedWith(Comparator { a, b ->
@@ -3477,10 +3646,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 updateDisplayedChapters()
             } catch (e: Exception) {
                 e.printStackTrace()
-                allRawChapters.value = emptyList()
-                availableLanguages.value = emptyList()
-                chapters.value = emptyList()
-                chaptersError.value = "Unable to load chapters: ${e.localizedMessage ?: "Network error"}"
+                // Offline fallback if network fails
+                val offlineChs = offlineRepository.getOfflineChapters(mangaId).stateIn(viewModelScope).value
+                if (offlineChs.isNotEmpty()) {
+                    val offChapters = offlineChs.map { off ->
+                        ChapterData(
+                            id = off.chapterId,
+                            type = "chapter",
+                            attributes = ChapterAttributes(
+                                volume = "1",
+                                chapter = off.chapterNumber,
+                                title = off.title,
+                                translatedLanguage = "en",
+                                pages = off.pageCount,
+                                publishAt = "2024-01-01T00:00:00+00:00"
+                            )
+                        )
+                    }
+                    allRawChapters.value = offChapters
+                    availableLanguages.value = listOf("en")
+                    selectedChapterLanguage.value = "en"
+                    updateDisplayedChapters()
+                } else {
+                    allRawChapters.value = emptyList()
+                    availableLanguages.value = emptyList()
+                    chapters.value = emptyList()
+                    chaptersError.value = "Unable to load chapters: ${e.localizedMessage ?: "Network error"}"
+                }
             } finally {
                 isLoading.value = false
             }
@@ -3491,10 +3683,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isLoading.value = true
             imageUrls.value = emptyList()
+
+            // 0. Check in-memory cache for instant 0ms reader opening!
+            val cached = chapterImagesCache[chapterId]
+            if (!cached.isNullOrEmpty()) {
+                imageUrls.value = cached
+                isLoading.value = false
+                return@launch
+            }
+
             try {
                 // 1. Check local offline storage first
                 val offlineUrls = offlineRepository.getOfflinePageUrls(chapterId)
                 if (!offlineUrls.isNullOrEmpty()) {
+                    chapterImagesCache[chapterId] = offlineUrls
                     imageUrls.value = offlineUrls
                     return@launch
                 }
@@ -3503,6 +3705,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (com.example.repository.ThreeDComicsRepository.is3DChapter(chapterId)) {
                     val threeDPages = com.example.repository.ThreeDComicsRepository.getPageUrlsForChapter(chapterId)
                     if (!threeDPages.isNullOrEmpty()) {
+                        chapterImagesCache[chapterId] = threeDPages
                         imageUrls.value = threeDPages
                         return@launch
                     }
@@ -3512,6 +3715,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (com.example.repository.MantaRepository.isMantaId(chapterId)) {
                     val mtaPages = com.example.repository.MantaRepository.getChapterImages(chapterId)
                     if (mtaPages.isNotEmpty()) {
+                        chapterImagesCache[chapterId] = mtaPages
                         imageUrls.value = mtaPages
                         return@launch
                     }
@@ -3521,6 +3725,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (com.example.repository.MangaToonRepository.isMangaToonId(chapterId)) {
                     val mtoPages = com.example.repository.MangaToonRepository.getChapterImages(chapterId)
                     if (mtoPages.isNotEmpty()) {
+                        chapterImagesCache[chapterId] = mtoPages
                         imageUrls.value = mtoPages
                         return@launch
                     }
@@ -3530,6 +3735,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (com.example.repository.ManhwaToonRepository.isManhwaToonId(chapterId)) {
                     val mtPages = com.example.repository.ManhwaToonRepository.getChapterImages(chapterId)
                     if (mtPages.isNotEmpty()) {
+                        chapterImagesCache[chapterId] = mtPages
                         imageUrls.value = mtPages
                         return@launch
                     }
@@ -3548,6 +3754,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val nhId = if (numericDigits.length in 5..8) numericDigits else cleanId.removePrefix("3d_").removePrefix("nh_").removePrefix("comic_")
                         val nhDetail = nhApiRepository.getDetail(nhId)
                         if (nhDetail != null && nhDetail.pages.isNotEmpty()) {
+                            chapterImagesCache[chapterId] = nhDetail.pages
                             imageUrls.value = nhDetail.pages
                             return@launch
                         }
@@ -3555,6 +3762,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     val detail = jandaRepository.getDetail("all", cleanId)
                     if (detail != null && detail.pages.isNotEmpty()) {
+                        chapterImagesCache[chapterId] = detail.pages
                         imageUrls.value = detail.pages
                         return@launch
                     }
@@ -3583,6 +3791,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
 
                             if (fileList.isNotEmpty()) {
+                                chapterImagesCache[chapterId] = fileList
                                 imageUrls.value = fileList
                                 return@launch
                             }
@@ -3595,6 +3804,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // 4. Mirror scanlation fallback if MangaDex server failed or had 0 pages
                 val fallbackDetail = jandaRepository.getDetail("all", chapterId)
                 if (fallbackDetail != null && fallbackDetail.pages.isNotEmpty()) {
+                    chapterImagesCache[chapterId] = fallbackDetail.pages
                     imageUrls.value = fallbackDetail.pages
                     return@launch
                 }

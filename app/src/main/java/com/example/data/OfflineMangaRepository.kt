@@ -115,21 +115,38 @@ class OfflineMangaRepository(
                 val ext = if (url.contains(".png", ignoreCase = true)) "png" else if (url.contains(".webp", ignoreCase = true)) "webp" else "jpg"
                 val pageFile = File(chapterDir, "page_${index + 1}.$ext")
 
-                try {
-                    val requestBuilder = Request.Builder().url(url)
-                    val response = httpClient.newCall(requestBuilder.build()).execute()
-                    if (response.isSuccessful && response.body != null) {
-                        val bytes = response.body!!.bytes()
-                        FileOutputStream(pageFile).use { fos ->
-                            fos.write(bytes)
+                var downloaded = false
+                var attempts = 0
+                while (!downloaded && attempts < 2) {
+                    attempts++
+                    try {
+                        val requestBuilder = Request.Builder().url(url)
+                            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                        if (url.contains("mangadex.org") || url.contains("uploads.mangadex.org")) {
+                            requestBuilder.addHeader("Referer", "https://mangadex.org/")
+                        } else if (url.contains("nhentai") || url.contains("pururin") || url.contains("hentaifox") || url.contains("3hentai")) {
+                            requestBuilder.addHeader("Referer", "https://nhentai.net/")
                         }
-                        chapterTotalBytes += bytes.size
-                        localPaths.add(pageFile.absolutePath)
-                    } else {
-                        return@withContext false
+
+                        val response = httpClient.newCall(requestBuilder.build()).execute()
+                        if (response.isSuccessful && response.body != null) {
+                            val bytes = response.body!!.bytes()
+                            if (bytes.isNotEmpty()) {
+                                FileOutputStream(pageFile).use { fos ->
+                                    fos.write(bytes)
+                                }
+                                chapterTotalBytes += bytes.size
+                                localPaths.add(pageFile.absolutePath)
+                                downloaded = true
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w("OfflineRepo", "Attempt $attempts failed for page $index: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    Log.w("OfflineRepo", "Failed to download page $index: ${e.message}")
+                }
+
+                if (!downloaded) {
+                    Log.w("OfflineRepo", "Failed to download page $index after retries: $url")
                     return@withContext false
                 }
 

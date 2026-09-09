@@ -49,7 +49,18 @@ class SettingsRepository(private val context: Context) {
         val INCLUDED_TAGS = stringSetPreferencesKey("included_tags")
         val MIN_CHAPTER_COUNT = androidx.datastore.preferences.core.intPreferencesKey("min_chapter_count")
         val STATUS_FILTER = androidx.datastore.preferences.core.stringPreferencesKey("status_filter")
+        val SOURCE_MANGADEX_ENABLED = booleanPreferencesKey("source_mangadex_enabled")
+        val SOURCE_MANTA_ENABLED = booleanPreferencesKey("source_manta_enabled")
+        val SOURCE_MANGATOON_ENABLED = booleanPreferencesKey("source_mangatoon_enabled")
+        val SOURCE_MANHWATOON_ENABLED = booleanPreferencesKey("source_manhwatoon_enabled")
+        val SOURCE_3D_ENABLED = booleanPreferencesKey("source_3d_enabled")
     }
+
+    val sourceMangaDexEnabled: Flow<Boolean> = context.dataStore.data.map { it[SOURCE_MANGADEX_ENABLED] ?: true }
+    val sourceMantaEnabled: Flow<Boolean> = context.dataStore.data.map { it[SOURCE_MANTA_ENABLED] ?: true }
+    val sourceMangaToonEnabled: Flow<Boolean> = context.dataStore.data.map { it[SOURCE_MANGATOON_ENABLED] ?: true }
+    val sourceManhwaToonEnabled: Flow<Boolean> = context.dataStore.data.map { it[SOURCE_MANHWATOON_ENABLED] ?: true }
+    val source3dEnabled: Flow<Boolean> = context.dataStore.data.map { it[SOURCE_3D_ENABLED] ?: true }
 
     val isAgeVerified: Flow<Boolean> = context.dataStore.data.map { it[IS_AGE_VERIFIED] ?: true }
     val isAgeWarningDismissedPermanent: Flow<Boolean> = context.dataStore.data.map { it[AGE_WARNING_DISMISSED_PERMANENT] ?: false }
@@ -240,5 +251,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setRating(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, value: Boolean) {
         context.dataStore.edit { it[key] = value }
+    }
+
+    suspend fun setSourceEnabled(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, enabled: Boolean) {
+        context.dataStore.edit { it[key] = enabled }
     }
 }
