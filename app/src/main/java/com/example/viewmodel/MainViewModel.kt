@@ -991,45 +991,122 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun <T> rotateDaily(list: List<T>, salt: Int = 0): List<T> {
+        if (list.size <= 2) return list
+        val dayIndex = (System.currentTimeMillis() / (1000L * 60 * 60 * 24)).toInt() + salt
+        val shift = Math.floorMod(dayIndex * 3, list.size)
+        return if (shift == 0) list else list.drop(shift) + list.take(shift)
+    }
+
+    private fun getDailyOffset(salt: Int, maxOffset: Int = 45): Int {
+        val dayIndex = (System.currentTimeMillis() / (1000L * 60 * 60 * 24)).toInt()
+        return Math.floorMod((dayIndex + salt) * 7, maxOffset).coerceAtLeast(0)
+    }
+
     private fun fetchCategoryRows() {
         viewModelScope.launch {
             try {
                 val ratings = getActiveRatings()
-                // Manga (Japanese)
-                val mangaRes = api.getMangaList(
-                    originalLanguages = listOf("ja"),
-                    contentRatings = ratings,
-                    orderFollowedCount = "desc",
-                    limit = 25
-                )
-                mangaCategoryList.value = mangaRes.data
 
-                // Manhwa (Korean)
-                val manhwaRes = api.getMangaList(
-                    originalLanguages = listOf("ko"),
-                    contentRatings = ratings,
-                    orderFollowedCount = "desc",
-                    limit = 25
-                )
-                manhwaCategoryList.value = manhwaRes.data
+                // Manga (Japanese) - Recent drops + daily rotated top series
+                val jaOffset = getDailyOffset(1, 45)
+                val jaCombined = mutableListOf<MangaData>()
+                val jaIds = mutableSetOf<String>()
+                try {
+                    val jaRecent = api.getMangaList(
+                        originalLanguages = listOf("ja"),
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 15
+                    )
+                    for (m in jaRecent.data) if (jaIds.add(m.id)) jaCombined.add(m)
+                } catch (_: Exception) {}
+                try {
+                    val mangaRes = api.getMangaList(
+                        originalLanguages = listOf("ja"),
+                        contentRatings = ratings,
+                        orderFollowedCount = "desc",
+                        limit = 25,
+                        offset = jaOffset
+                    )
+                    for (m in mangaRes.data) if (jaIds.add(m.id)) jaCombined.add(m)
+                } catch (_: Exception) {}
+                if (jaCombined.isNotEmpty()) mangaCategoryList.value = jaCombined
 
-                // Manhua (Chinese)
-                val manhuaRes = api.getMangaList(
-                    originalLanguages = listOf("zh", "zh-hk"),
-                    contentRatings = ratings,
-                    orderFollowedCount = "desc",
-                    limit = 25
-                )
-                manhuaCategoryList.value = manhuaRes.data
+                // Manhwa (Korean) - Recent drops + daily rotated top series
+                val koOffset = getDailyOffset(2, 45)
+                val koCombined = mutableListOf<MangaData>()
+                val koIds = mutableSetOf<String>()
+                try {
+                    val koRecent = api.getMangaList(
+                        originalLanguages = listOf("ko"),
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 15
+                    )
+                    for (m in koRecent.data) if (koIds.add(m.id)) koCombined.add(m)
+                } catch (_: Exception) {}
+                try {
+                    val manhwaRes = api.getMangaList(
+                        originalLanguages = listOf("ko"),
+                        contentRatings = ratings,
+                        orderFollowedCount = "desc",
+                        limit = 25,
+                        offset = koOffset
+                    )
+                    for (m in manhwaRes.data) if (koIds.add(m.id)) koCombined.add(m)
+                } catch (_: Exception) {}
+                if (koCombined.isNotEmpty()) manhwaCategoryList.value = koCombined
 
-                // Comics (English / Western / Webcomics)
-                val comicsRes = api.getMangaList(
-                    originalLanguages = listOf("en", "fr", "es"),
-                    contentRatings = ratings,
-                    orderFollowedCount = "desc",
-                    limit = 30
-                )
-                comicsCategoryList.value = comicsRes.data
+                // Manhua (Chinese) - Recent drops + daily rotated top series
+                val zhOffset = getDailyOffset(3, 40)
+                val zhCombined = mutableListOf<MangaData>()
+                val zhIds = mutableSetOf<String>()
+                try {
+                    val zhRecent = api.getMangaList(
+                        originalLanguages = listOf("zh", "zh-hk"),
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 15
+                    )
+                    for (m in zhRecent.data) if (zhIds.add(m.id)) zhCombined.add(m)
+                } catch (_: Exception) {}
+                try {
+                    val manhuaRes = api.getMangaList(
+                        originalLanguages = listOf("zh", "zh-hk"),
+                        contentRatings = ratings,
+                        orderFollowedCount = "desc",
+                        limit = 25,
+                        offset = zhOffset
+                    )
+                    for (m in manhuaRes.data) if (zhIds.add(m.id)) zhCombined.add(m)
+                } catch (_: Exception) {}
+                if (zhCombined.isNotEmpty()) manhuaCategoryList.value = zhCombined
+
+                // Comics (English / Western / Webcomics) - Recent drops + daily rotated top
+                val enOffset = getDailyOffset(4, 40)
+                val enCombined = mutableListOf<MangaData>()
+                val enIds = mutableSetOf<String>()
+                try {
+                    val enRecent = api.getMangaList(
+                        originalLanguages = listOf("en", "fr", "es"),
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 15
+                    )
+                    for (m in enRecent.data) if (enIds.add(m.id)) enCombined.add(m)
+                } catch (_: Exception) {}
+                try {
+                    val comicsRes = api.getMangaList(
+                        originalLanguages = listOf("en", "fr", "es"),
+                        contentRatings = ratings,
+                        orderFollowedCount = "desc",
+                        limit = 25,
+                        offset = enOffset
+                    )
+                    for (m in comicsRes.data) if (enIds.add(m.id)) enCombined.add(m)
+                } catch (_: Exception) {}
+                if (enCombined.isNotEmpty()) comicsCategoryList.value = enCombined
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1042,30 +1119,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val ratings = listOf("suggestive", "erotica", "pornographic")
                 val combined = mutableListOf<MangaData>()
                 val existingIds = mutableSetOf<String>()
+                val dailyOffset = getDailyOffset(5, 50)
 
-                // 1. Top followed Ecchi & Erotica series
-                val topEcchiRes = api.getMangaList(
-                    contentRatings = ratings,
-                    orderFollowedCount = "desc",
-                    limit = 45
-                )
-                for (m in topEcchiRes.data) {
-                    if (existingIds.add(m.id)) combined.add(m)
-                }
+                // 1. Recent Drops: Newly uploaded chapters in Ecchi, Smut & Erotica
+                try {
+                    val recentEcchiRes = api.getMangaList(
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 30
+                    )
+                    for (m in recentEcchiRes.data) {
+                        if (existingIds.add(m.id)) combined.add(m)
+                    }
+                } catch (_: Exception) {}
 
-                // 2. High-rated Ecchi & Erotica classics
+                // 2. Daily Rotated Top Ecchi & Smut series
+                try {
+                    val topEcchiRes = api.getMangaList(
+                        contentRatings = ratings,
+                        orderFollowedCount = "desc",
+                        limit = 35,
+                        offset = dailyOffset
+                    )
+                    for (m in topEcchiRes.data) {
+                        if (existingIds.add(m.id)) combined.add(m)
+                    }
+                } catch (_: Exception) {}
+
+                // 3. High-rated Ecchi & Erotica classics (with secondary daily rotation)
                 try {
                     val topRatedEcchi = api.getMangaList(
                         contentRatings = ratings,
                         orderRating = "desc",
-                        limit = 25
+                        limit = 25,
+                        offset = ((dailyOffset / 2) % 25)
                     )
                     for (m in topRatedEcchi.data) {
                         if (existingIds.add(m.id)) combined.add(m)
                     }
                 } catch (_: Exception) {}
 
-                ecchiComicsList.value = combined
+                if (combined.isNotEmpty()) {
+                    ecchiComicsList.value = combined
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1077,10 +1173,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val combined = mutableListOf<MangaData>()
                 val existingIds = mutableSetOf<String>()
+                val dayIndex = (System.currentTimeMillis() / (1000L * 60 * 60 * 24)).toInt()
+                val dailyOffset = getDailyOffset(6, 30)
 
-                // 1. Curated 3D Comics & CG Graphic Novels with multi-chapter series
+                // 1. Curated 3D Comics & CG Graphic Novels rotated daily
                 val curated3d = com.example.repository.ThreeDComicsRepository.getAll3DComics()
-                for (m in curated3d) {
+                val rotatedCurated = rotateDaily(curated3d, 1)
+                for (m in rotatedCurated) {
                     if (existingIds.add(m.id)) combined.add(m)
                 }
                 threeDComicsList.value = combined.toList()
@@ -1088,9 +1187,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mangas.value = combined.toList()
                 }
 
-                // Query live 3D & CG titles from nHentai v2 API
+                // 2. Query live 3D & CG titles from nHentai v2 API with daily page offset
                 try {
-                    val nh3d = com.example.api.nhapi.NhApiClient.directApi.searchV2("3d", page = 1)
+                    val nhPage = (Math.floorMod(dayIndex, 5) + 1)
+                    val nh3d = com.example.api.nhapi.NhApiClient.directApi.searchV2("3d", page = nhPage)
                     if (nh3d.isSuccessful) {
                         nh3d.body()?.result?.forEach { item ->
                             val itemId = item.id?.toString() ?: return@forEach
@@ -1125,14 +1225,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } catch (_: Exception) {}
 
-                // Query additional 3D & CG titles from MangaDex
+                // 3. Query 3D & CG titles from MangaDex with recent drops and daily offset
                 try {
                     val ratings = listOf("safe", "suggestive", "erotica", "pornographic")
+                    // Recent drops for 3D
+                    val recent3d = api.getMangaList(
+                        title = "3D",
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 20
+                    )
+                    for (m in recent3d.data) {
+                        if (existingIds.add(m.id)) combined.add(m)
+                    }
+
+                    // Daily rotated top 3D
                     val res3d = api.getMangaList(
                         title = "3D",
                         contentRatings = ratings,
                         orderFollowedCount = "desc",
-                        limit = 25
+                        limit = 25,
+                        offset = dailyOffset
                     )
                     for (m in res3d.data) {
                         if (existingIds.add(m.id)) combined.add(m)
@@ -1157,23 +1270,58 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val ratings = listOf("erotica", "pornographic", "suggestive")
                 val combined = mutableListOf<MangaData>()
                 val existingIds = mutableSetOf<String>()
+                val dailyOffset = getDailyOffset(7, 45)
 
-
-
-                // Fast batch query: Top Korean 18+ Webtoons
-                val topAdultRes = api.getMangaList(
-                    originalLanguages = listOf("ko"),
-                    contentRatings = ratings,
-                    orderFollowedCount = "desc",
-                    limit = 35
-                )
-                for (m in topAdultRes.data) {
-                    if (existingIds.add(m.id)) {
-                        combined.add(m)
+                // 1. Recent Drops: Latest chapter uploads for Korean 18+ Webtoons / Manhwa
+                try {
+                    val recentDrops = api.getMangaList(
+                        originalLanguages = listOf("ko"),
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 30
+                    )
+                    for (m in recentDrops.data) {
+                        if (existingIds.add(m.id)) {
+                            combined.add(m)
+                        }
                     }
-                }
+                } catch (_: Exception) {}
 
-                adultWebtoonsList.value = combined
+                // 2. Daily Rotated Top Korean 18+ Webtoons
+                try {
+                    val topAdultRes = api.getMangaList(
+                        originalLanguages = listOf("ko"),
+                        contentRatings = ratings,
+                        orderFollowedCount = "desc",
+                        limit = 35,
+                        offset = dailyOffset
+                    )
+                    for (m in topAdultRes.data) {
+                        if (existingIds.add(m.id)) {
+                            combined.add(m)
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                // 3. Fresh New Webtoon Releases (new additions)
+                try {
+                    val newWebtoons = api.getMangaList(
+                        originalLanguages = listOf("ko"),
+                        contentRatings = ratings,
+                        orderCreatedAt = "desc",
+                        limit = 20,
+                        offset = ((dailyOffset / 2) % 20)
+                    )
+                    for (m in newWebtoons.data) {
+                        if (existingIds.add(m.id)) {
+                            combined.add(m)
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                if (combined.isNotEmpty()) {
+                    adultWebtoonsList.value = combined
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1302,13 +1450,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
 
-                for (c in curatedComics) {
+                val rotatedCurated = rotateDaily(curatedComics, 3)
+                for (c in rotatedCurated) {
                     if (existingIds.add(c.id)) combined.add(c)
                 }
 
-                // 2. Query live graphic novels from nHentai API v2
+                // 2. Query live graphic novels from nHentai API v2 with daily page rotation
                 try {
-                    val nhGNovels = com.example.api.nhapi.NhApiClient.directApi.searchV2("graphic novel english", page = 1)
+                    val dayIndex = (System.currentTimeMillis() / (1000L * 60 * 60 * 24)).toInt()
+                    val nhPage = (Math.floorMod(dayIndex, 6) + 1)
+                    val nhGNovels = com.example.api.nhapi.NhApiClient.directApi.searchV2("graphic novel english", page = nhPage)
                     if (nhGNovels.isSuccessful) {
                         nhGNovels.body()?.result?.forEach { item ->
                             val itemId = item.id?.toString() ?: return@forEach
@@ -1343,21 +1494,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } catch (_: Exception) {}
 
-                // 3. Query adult Western & Graphic Comics from MangaDex
+                // 3. Query adult Western & Graphic Comics from MangaDex with recent drops and daily offset
                 try {
                     val ratings = listOf("erotica", "pornographic", "suggestive")
+                    val dailyOffset = getDailyOffset(8, 40)
+                    // Recent drops
+                    val recentComics = api.getMangaList(
+                        originalLanguages = listOf("en", "fr", "es", "it", "de"),
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 20
+                    )
+                    for (m in recentComics.data) {
+                        if (existingIds.add(m.id)) combined.add(m)
+                    }
+
+                    // Daily rotated top
                     val topRes = api.getMangaList(
                         originalLanguages = listOf("en", "fr", "es", "it", "de"),
                         contentRatings = ratings,
                         orderFollowedCount = "desc",
-                        limit = 35
+                        limit = 25,
+                        offset = dailyOffset
                     )
                     for (m in topRes.data) {
                         if (existingIds.add(m.id)) combined.add(m)
                     }
                 } catch (_: Exception) {}
 
-                adultComicsList.value = combined
+                if (combined.isNotEmpty()) {
+                    adultComicsList.value = combined
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1369,14 +1536,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val ratings = listOf("erotica", "pornographic", "suggestive")
                 val doujinTagId = "b13b2a48-c720-44a9-9c77-39c9979373fb"
-                // Fast batch query for top doujinshis & parodies with adult ratings
-                val topParodyRes = api.getMangaList(
-                    includedTags = listOf(doujinTagId),
-                    contentRatings = ratings,
-                    orderFollowedCount = "desc",
-                    limit = 35
-                )
-                parodyMangasList.value = topParodyRes.data
+                val combined = mutableListOf<MangaData>()
+                val existingIds = mutableSetOf<String>()
+                val dailyOffset = getDailyOffset(9, 35)
+
+                // Recent drops in parodies & doujinshi
+                try {
+                    val recentParody = api.getMangaList(
+                        includedTags = listOf(doujinTagId),
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 20
+                    )
+                    for (m in recentParody.data) if (existingIds.add(m.id)) combined.add(m)
+                } catch (_: Exception) {}
+
+                // Daily rotated top parodies
+                try {
+                    val topParodyRes = api.getMangaList(
+                        includedTags = listOf(doujinTagId),
+                        contentRatings = ratings,
+                        orderFollowedCount = "desc",
+                        limit = 25,
+                        offset = dailyOffset
+                    )
+                    for (m in topParodyRes.data) if (existingIds.add(m.id)) combined.add(m)
+                } catch (_: Exception) {}
+
+                if (combined.isNotEmpty()) {
+                    parodyMangasList.value = combined
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1648,13 +1837,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val ratings = listOf("safe", "suggestive", "erotica", "pornographic")
                 val doujinTagId = "b13b2a48-c720-44a9-9c77-39c9979373fb"
-                val res = api.getMangaList(
-                    includedTags = listOf(doujinTagId),
-                    contentRatings = ratings,
-                    orderFollowedCount = "desc",
-                    limit = 35
-                )
-                doujinshiList.value = res.data
+                val combined = mutableListOf<MangaData>()
+                val existingIds = mutableSetOf<String>()
+                val dailyOffset = getDailyOffset(10, 35)
+
+                // 1. Recent Drops in Doujinshi
+                try {
+                    val recentDoujin = api.getMangaList(
+                        includedTags = listOf(doujinTagId),
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 15
+                    )
+                    for (m in recentDoujin.data) if (existingIds.add(m.id)) combined.add(m)
+                } catch (_: Exception) {}
+
+                // 2. Daily Rotated Top Doujinshi
+                try {
+                    val res = api.getMangaList(
+                        includedTags = listOf(doujinTagId),
+                        contentRatings = ratings,
+                        orderFollowedCount = "desc",
+                        limit = 25,
+                        offset = dailyOffset
+                    )
+                    for (m in res.data) if (existingIds.add(m.id)) combined.add(m)
+                } catch (_: Exception) {}
+
+                if (combined.isNotEmpty()) {
+                    doujinshiList.value = combined
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1665,13 +1877,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val ratings = listOf("safe", "suggestive", "erotica", "pornographic")
-                // Fast batch query for top rated GOAT mangas
+                val dailyOffset = getDailyOffset(11, 40)
+                // Fast batch query for top rated GOAT mangas rotated daily
                 val topRes = api.getMangaList(
                     contentRatings = ratings,
                     orderRating = "desc",
-                    limit = 35
+                    limit = 35,
+                    offset = dailyOffset
                 )
-                goatMangas.value = topRes.data
+                if (topRes.data.isNotEmpty()) {
+                    goatMangas.value = topRes.data
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1684,38 +1900,82 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val ratings = listOf("erotica", "pornographic")
                 val combined = mutableListOf<MangaData>()
                 val existingIds = mutableSetOf<String>()
+                val dayIndex = (System.currentTimeMillis() / (1000L * 60 * 60 * 24)).toInt()
+                val dailyOffset = getDailyOffset(12, 45)
 
-                // Special Spotlight: Everyday Conversations With My Big Sister & Urakan
-                val spotlight = userFavoriteSpotlightManga.value
-                if (existingIds.add(spotlight.id)) {
-                    combined.add(spotlight)
-                }
-
-                val urakanManga = MangaData(
-                    id = "331461",
-                    attributes = MangaAttributes(
-                        title = mapOf("en" to "[Urakan] Kanojo x Kanojo x Kanojo 1 - Special Episode [English]"),
-                        description = mapOf("en" to "Special harem romance episode by master artist Urakan."),
-                        originalLanguage = "ja",
-                        contentRating = "pornographic",
-                        status = "completed"
+                // 1. Curated Spotlights Pool: Daily rotation for which taboo classic leads
+                val curatedSpotlights = listOf(
+                    userFavoriteSpotlightManga.value,
+                    MangaData(
+                        id = "331461",
+                        attributes = MangaAttributes(
+                            title = mapOf("en" to "[Urakan] Kanojo x Kanojo x Kanojo 1 - Special Episode [English]"),
+                            description = mapOf("en" to "Special harem romance episode by master artist Urakan."),
+                            originalLanguage = "ja",
+                            contentRating = "pornographic",
+                            status = "completed"
+                        ),
+                        relationships = listOf(
+                            Relationship(id = "331461", type = "cover_art", attributes = RelationshipAttributes(fileName = "https://t.nhentai.net/galleries/1748231/cover.jpg")),
+                            Relationship(id = "urakan", type = "author", attributes = RelationshipAttributes(name = "Urakan"))
+                        )
                     ),
-                    relationships = listOf(
-                        Relationship(id = "331461", type = "cover_art", attributes = RelationshipAttributes(fileName = "https://t.nhentai.net/galleries/1748231/cover.jpg")),
-                        Relationship(id = "urakan", type = "author", attributes = RelationshipAttributes(name = "Urakan"))
+                    MangaData(
+                        id = "412580",
+                        attributes = MangaAttributes(
+                            title = mapOf("en" to "[Hanpatsu] Everyday Conversation with My Big Sister 1 [English]"),
+                            description = mapOf("en" to "Everyday Conversation with My Big Sister (Ane to no Mainichi no Kaiwa)."),
+                            originalLanguage = "ja",
+                            contentRating = "pornographic",
+                            status = "completed"
+                        ),
+                        relationships = listOf(
+                            Relationship(id = "412580", type = "cover_art", attributes = RelationshipAttributes(fileName = "https://t.nhentai.net/galleries/2279150/cover.jpg")),
+                            Relationship(id = "hanpatsu", type = "author", attributes = RelationshipAttributes(name = "Hanpatsu"))
+                        )
+                    ),
+                    MangaData(
+                        id = "368084",
+                        attributes = MangaAttributes(
+                            title = mapOf("en" to "[Danimaru] Midnight Cinderella - Graphic Novel [Full Color English]"),
+                            description = mapOf("en" to "Masterpiece graphic novel illustrated by Danimaru in vibrant full color."),
+                            originalLanguage = "en",
+                            contentRating = "pornographic",
+                            status = "completed"
+                        ),
+                        relationships = listOf(
+                            Relationship(id = "368084", type = "cover_art", attributes = RelationshipAttributes(fileName = "https://t.nhentai.net/galleries/1996892/thumb.jpg")),
+                            Relationship(id = "danimaru", type = "author", attributes = RelationshipAttributes(name = "Danimaru"))
+                        )
                     )
                 )
-                if (existingIds.add(urakanManga.id)) {
-                    combined.add(urakanManga)
+
+                val todaySpotlight = curatedSpotlights[Math.floorMod(dayIndex, curatedSpotlights.size)]
+                if (existingIds.add(todaySpotlight.id)) {
+                    combined.add(todaySpotlight)
                 }
 
+                // 2. Recent Drops: Latest chapter uploads for mature/18+ titles
+                try {
+                    val recentDrops = api.getMangaList(
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 30
+                    )
+                    for (m in recentDrops.data) {
+                        if (existingIds.add(m.id)) {
+                            combined.add(m)
+                        }
+                    }
+                } catch (_: Exception) {}
 
-                // Fast batch queries for 18+ titles
+                // 3. Daily Rotated Top Mature Hits
                 try {
                     val tagRes = api.getMangaList(
                         contentRatings = ratings,
                         orderFollowedCount = "desc",
-                        limit = 35
+                        limit = 35,
+                        offset = dailyOffset
                     )
                     for (m in tagRes.data) {
                         if (existingIds.add(m.id)) {
@@ -1724,7 +1984,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } catch (_: Exception) {}
 
-                matureNtrLibrary.value = combined
+                // 4. High-rated Mature Classics
+                try {
+                    val topMature = api.getMangaList(
+                        contentRatings = ratings,
+                        orderRating = "desc",
+                        limit = 20,
+                        offset = ((dailyOffset / 2) % 25)
+                    )
+                    for (m in topMature.data) {
+                        if (existingIds.add(m.id)) {
+                            combined.add(m)
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                // Add remaining curated spotlights
+                for (s in curatedSpotlights) {
+                    if (existingIds.add(s.id)) combined.add(s)
+                }
+
+                if (combined.isNotEmpty()) {
+                    matureNtrLibrary.value = combined
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1790,6 +2072,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         quickPeekChapters.value = emptyList()
     }
 
+    fun refreshAll() {
+        viewModelScope.launch {
+            isLoading.value = true
+            updateAllFreshMangas()
+            fetchTags()
+            fetchMangas()
+            fetchSpecialSections()
+            fetchCategoryRows()
+            fetchGoatMangas()
+            fetchFullColorMangas()
+            fetchMatureNtrLibrary()
+            fetchEcchiComics()
+            fetchThreeDComics()
+            fetchAdultWebtoons()
+            fetch18PlusComics()
+            fetch18PlusParodies()
+            fetchDoujinshis()
+            fetchSpecialInterestMangas()
+            fetchCultivationGoatMangas()
+            fetchOverflowMangas()
+            fetchFeaturedAuthors()
+            fetchManhwaToon()
+            fetchMangaToon()
+            fetchManta()
+            isLoading.value = false
+        }
+    }
+
     fun getRandomSurprisePick(): MangaData? {
         val pool = (latestMangas.value + matureNtrLibrary.value + fullColorMangas.value + adultWebtoonsList.value + goatMangas.value + mangas.value).distinctBy { it.id }
         return if (pool.isNotEmpty()) pool.random() else null
@@ -1799,12 +2109,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val ratings = getActiveRatings()
+                val dailyOffset = getDailyOffset(15, 30)
                 val topRatedRes = api.getMangaList(
                     contentRatings = ratings,
                     orderRating = "desc",
-                    limit = 12
+                    limit = 15,
+                    offset = dailyOffset
                 )
-                topRatedMangas.value = topRatedRes.data
+                if (topRatedRes.data.isNotEmpty()) {
+                    topRatedMangas.value = topRatedRes.data
+                }
 
                 // 1. Fetch fresh 18+ titles (Erotica & Pornographic) with recent chapter uploads (ongoing only)
                 val latest18Res = try {
@@ -1877,14 +2191,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val ratings = listOf("safe", "suggestive", "erotica", "pornographic")
-                // Fast batch query for Cultivation & Manhua titles
-                val cultivationQueryRes = api.getMangaList(
-                    originalLanguages = listOf("zh", "zh-hk", "ko"),
-                    contentRatings = ratings,
-                    orderFollowedCount = "desc",
-                    limit = 35
-                )
-                cultivationGoatMangas.value = cultivationQueryRes.data
+                val combined = mutableListOf<MangaData>()
+                val existingIds = mutableSetOf<String>()
+                val dailyOffset = getDailyOffset(13, 35)
+
+                // 1. Recent Drops in Cultivation & Martial Arts
+                try {
+                    val recentCult = api.getMangaList(
+                        originalLanguages = listOf("zh", "zh-hk", "ko"),
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 15
+                    )
+                    for (m in recentCult.data) if (existingIds.add(m.id)) combined.add(m)
+                } catch (_: Exception) {}
+
+                // 2. Daily Rotated Top Cultivation & Manhua titles
+                try {
+                    val cultivationQueryRes = api.getMangaList(
+                        originalLanguages = listOf("zh", "zh-hk", "ko"),
+                        contentRatings = ratings,
+                        orderFollowedCount = "desc",
+                        limit = 25,
+                        offset = dailyOffset
+                    )
+                    for (m in cultivationQueryRes.data) if (existingIds.add(m.id)) combined.add(m)
+                } catch (_: Exception) {}
+
+                if (combined.isNotEmpty()) {
+                    cultivationGoatMangas.value = combined
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1896,13 +2232,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val ratings = listOf("safe", "suggestive", "erotica", "pornographic")
                 val fullColorTagId = "f5ba408b-0e7a-484d-8d49-4e9125ac96de"
-                val res = api.getMangaList(
-                    includedTags = listOf(fullColorTagId),
-                    contentRatings = ratings,
-                    orderFollowedCount = "desc",
-                    limit = 50
-                )
-                fullColorMangas.value = res.data
+                val combined = mutableListOf<MangaData>()
+                val existingIds = mutableSetOf<String>()
+                val dailyOffset = getDailyOffset(14, 35)
+
+                // 1. Recent Drops in Full Color
+                try {
+                    val recentFullColor = api.getMangaList(
+                        includedTags = listOf(fullColorTagId),
+                        contentRatings = ratings,
+                        orderLatestUploadedChapter = "desc",
+                        limit = 20
+                    )
+                    for (m in recentFullColor.data) if (existingIds.add(m.id)) combined.add(m)
+                } catch (_: Exception) {}
+
+                // 2. Daily Rotated Top Full Color Series
+                try {
+                    val res = api.getMangaList(
+                        includedTags = listOf(fullColorTagId),
+                        contentRatings = ratings,
+                        orderFollowedCount = "desc",
+                        limit = 30,
+                        offset = dailyOffset
+                    )
+                    for (m in res.data) if (existingIds.add(m.id)) combined.add(m)
+                } catch (_: Exception) {}
+
+                if (combined.isNotEmpty()) {
+                    fullColorMangas.value = combined
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -2214,10 +2573,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 
                 var results = if (is3d && threeDComicsList.value.isNotEmpty()) {
                     threeDComicsList.value
+                } else if (isEcchi && ecchiComicsList.value.isNotEmpty() && selectedSortOrder.value == MangaSortOrder.MOST_POPULAR) {
+                    ecchiComicsList.value
+                } else if (selectedCategory.value == MangaCategory.ADULT_WEBTOONS && adultWebtoonsList.value.isNotEmpty() && selectedSortOrder.value == MangaSortOrder.MOST_POPULAR) {
+                    adultWebtoonsList.value
+                } else if (selectedCategory.value == MangaCategory.NTR_18 && matureNtrLibrary.value.isNotEmpty() && selectedSortOrder.value == MangaSortOrder.MOST_POPULAR) {
+                    matureNtrLibrary.value
+                } else if (selectedCategory.value == MangaCategory.FULL_COLOR && fullColorMangas.value.isNotEmpty() && selectedSortOrder.value == MangaSortOrder.MOST_POPULAR) {
+                    fullColorMangas.value
+                } else if (selectedCategory.value == MangaCategory.GOAT && goatMangas.value.isNotEmpty() && selectedSortOrder.value == MangaSortOrder.MOST_POPULAR) {
+                    goatMangas.value
                 } else if (response.data.isNotEmpty()) {
                     response.data
-                } else if (isEcchi && ecchiComicsList.value.isNotEmpty()) {
-                    ecchiComicsList.value
                 } else {
                     response.data
                 }

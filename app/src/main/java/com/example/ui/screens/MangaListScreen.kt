@@ -851,13 +851,30 @@ fun HomeScreenContent(
                                     )
                                 )
                                 Text(
-                                    text = "Unlimited Manga, Webtoons & 18+ Vault",
+                                    text = "Daily Updated Manga, Webtoons & 18+ Vault",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         color = ThemeOnSurfaceVariant,
                                         fontSize = 11.sp
                                     )
                                 )
                             }
+                        }
+
+                        // Daily Refresh Action Button
+                        IconButton(
+                            onClick = { viewModel.refreshAll() },
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF2C1945))
+                                .testTag("home_refresh_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh categories and fetch latest drops",
+                                tint = Color(0xFF00E5FF),
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
@@ -873,6 +890,29 @@ fun HomeScreenContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFF00E5FF).copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .clickable { viewModel.refreshAll() }
+                                .testTag("home_daily_refresh_pill")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("🔄", fontSize = 12.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Daily Refresh",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF00E5FF)
+                                )
+                            }
+                        }
                         Surface(
                             shape = RoundedCornerShape(50),
                             color = Color(0xFF00E5FF).copy(alpha = 0.12f),
@@ -1439,7 +1479,7 @@ fun HomeScreenContent(
             item {
                 SectionHeader(
                     title = "🖤 Premium 18+ Vault (NTR, Incest & Mature Hits)",
-                    subtitle = "Everyday Conversations With My Big Sister, Yanmama, Secret Class & Taboo Masterpieces"
+                    subtitle = "Daily rotated mature hits, recent taboo uploads & curated classics"
                 )
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
@@ -1457,7 +1497,7 @@ fun HomeScreenContent(
             item {
                 SectionHeader(
                     title = "🔞 Adult 18+ Webtoons & Manhwa",
-                    subtitle = "Secret Class, Boarding Diary, Stepmother Friends & Adult Webtoon Hits"
+                    subtitle = "Recent chapter drops & daily rotated adult manhwa releases"
                 )
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
@@ -1475,7 +1515,7 @@ fun HomeScreenContent(
             item {
                 SectionHeader(
                     title = "🔥 Hot Ecchi, Smut & Harem",
-                    subtitle = "High School DxD, To LOVE-Ru, Prison School, Mato Seihei & Top Hits"
+                    subtitle = "Recent chapter drops & daily rotated ecchi, smut & harem hits"
                 )
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
@@ -1493,7 +1533,7 @@ fun HomeScreenContent(
             item {
                 SectionHeader(
                     title = "🧊 3D Comics & CG Graphic Novels",
-                    subtitle = "3D Rendered Webcomics, Stylized CGI, Blender & DAZ Visual Stories"
+                    subtitle = "Daily rotating 3D CGI stories & recent render updates"
                 )
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
@@ -1511,7 +1551,7 @@ fun HomeScreenContent(
             item {
                 SectionHeader(
                     title = "💋 18+ Adult Comics & Graphic Novels",
-                    subtitle = "Sunstone, Blood Stain, Alfie, Oglaf, Mirka Andolfo & Erotica Comics"
+                    subtitle = "Daily rotating adult graphic novels & recent releases"
                 )
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
