@@ -46,7 +46,7 @@ import com.example.viewmodel.NhSubTab
 import com.example.viewmodel.NhUiState
 
 private val POPULAR_TAGS = listOf(
-    "3d", "ecchi", "3d comic", "hanpatsu", "urakan", "sinful lust", "big sister", "doujinshi", "romance", "vanilla",
+    "3d", "ecchi", "3d comic", "hanpatsu", "urakan", "big sister", "doujinshi", "romance", "vanilla",
     "full color", "english", "japanese", "milf", "schoolgirl", "maid", "cosplay", "yuri", "erotica"
 )
 

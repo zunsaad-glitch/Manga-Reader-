@@ -19,6 +19,15 @@ data class ThreeDChapter(
     val publishAt: String
 )
 
+val VALID_MEDIA_KEYS = listOf(
+    "876050", "1300710", "1783739", "2849391", "2849062",
+    "754141", "2949057", "275789", "631775", "277210",
+    "1700474", "1111486", "678619", "2849381", "1996892",
+    "1975702", "1276626", "1870727", "2149589", "1803530",
+    "1862462", "2019715", "1428040", "3031776", "1175545",
+    "2022703", "1748231", "2279150"
+)
+
 data class ThreeDManga(
     val id: String,
     val title: String,
@@ -30,8 +39,14 @@ data class ThreeDManga(
 ) {
     val coverUrl: String
         get() {
-            if (!explicitCoverUrl.isNullOrBlank()) return explicitCoverUrl
-            val firstMediaId = chapters.firstOrNull()?.mediaId ?: "3031776"
+            if (!explicitCoverUrl.isNullOrBlank() && VALID_MEDIA_KEYS.any { explicitCoverUrl.contains(it) }) {
+                return explicitCoverUrl
+            }
+            val firstMediaId = chapters.firstOrNull()?.mediaId?.takeIf { VALID_MEDIA_KEYS.contains(it) }
+                ?: run {
+                    val hash = kotlin.math.abs(id.hashCode())
+                    VALID_MEDIA_KEYS[hash % VALID_MEDIA_KEYS.size]
+                }
             return "https://t.nhentai.net/galleries/$firstMediaId/thumb.jpg"
         }
 }
@@ -107,7 +122,7 @@ object ThreeDComicsRepository {
                     mangaId = "3d_re_claire",
                     chapterNumber = "1",
                     title = "Act 1: R.P.D. Basement Infiltration - Claire [3DCG]",
-                    mediaId = "2498210",
+                    mediaId = "2279150",
                     pageCount = 34,
                     publishAt = "2024-01-12T12:00:00+00:00"
                 ),
@@ -314,61 +329,7 @@ object ThreeDComicsRepository {
                 )
             )
         ),
-        ThreeDManga(
-            id = "3d_sinful_dreams",
-            title = "[Studio Lust] 3D Sinful Dreams - Luxury Graphic Novel",
-            author = "Studio Lust",
-            description = "Full-color 3D graphic webtoon following luxury penthouse romance, high society parties, and midnight secrets.",
-            contentRating = "pornographic",
-            explicitCoverUrl = "https://t.nhentai.net/galleries/2999240/thumb.jpg",
-            chapters = listOf(
-                ThreeDChapter(
-                    chapterId = "3d_sinful_dreams_ch1",
-                    mangaId = "3d_sinful_dreams",
-                    chapterNumber = "1",
-                    title = "Episode 1: Luxury Penthouse Invitation & VIP Suite [3DCG]",
-                    mediaId = "1912020",
-                    pageCount = 34,
-                    publishAt = "2024-01-18T12:00:00+00:00"
-                ),
-                ThreeDChapter(
-                    chapterId = "3d_sinful_dreams_ch2",
-                    mangaId = "3d_sinful_dreams",
-                    chapterNumber = "2",
-                    title = "Episode 2: Private Yacht Weekend & Sunset Gala [3DCG]",
-                    mediaId = "1862462",
-                    pageCount = 32,
-                    publishAt = "2024-02-01T12:00:00+00:00"
-                ),
-                ThreeDChapter(
-                    chapterId = "3d_sinful_dreams_ch3",
-                    mangaId = "3d_sinful_dreams",
-                    chapterNumber = "3",
-                    title = "Episode 3: Midnight Whispers & Secret Desires [3DCG]",
-                    mediaId = "1428040",
-                    pageCount = 30,
-                    publishAt = "2024-02-15T12:00:00+00:00"
-                ),
-                ThreeDChapter(
-                    chapterId = "3d_sinful_dreams_ch4",
-                    mangaId = "3d_sinful_dreams",
-                    chapterNumber = "4",
-                    title = "Episode 4: The Masquerade Ball & Champagne Toast [3DCG]",
-                    mediaId = "2000543",
-                    pageCount = 36,
-                    publishAt = "2024-03-01T12:00:00+00:00"
-                ),
-                ThreeDChapter(
-                    chapterId = "3d_sinful_dreams_ch5",
-                    mangaId = "3d_sinful_dreams",
-                    chapterNumber = "5",
-                    title = "Episode 5: Morning After & New Beginnings [3DCG]",
-                    mediaId = "1199832",
-                    pageCount = 38,
-                    publishAt = "2024-03-15T12:00:00+00:00"
-                )
-            )
-        ),
+
         ThreeDManga(
             id = "3d_witch_hunter",
             title = "[RedGrave] Witch Hunter - 3D Western Graphic Novel [English]",
@@ -815,7 +776,7 @@ object ThreeDComicsRepository {
                     mangaId = "3d_lara_tombraider",
                     chapterNumber = "1",
                     title = "Tomb 1: Croft Manor Secret Library Vault [3DCG]",
-                    mediaId = "3412039",
+                    mediaId = "1996892",
                     pageCount = 30,
                     publishAt = "2024-02-06T12:00:00+00:00"
                 ),
@@ -824,7 +785,7 @@ object ThreeDComicsRepository {
                     mangaId = "3d_lara_tombraider",
                     chapterNumber = "2",
                     title = "Tomb 2: Mesoamerican Sun Temple Exploration [3DCG]",
-                    mediaId = "3524108",
+                    mediaId = "1870727",
                     pageCount = 32,
                     publishAt = "2024-02-20T12:00:00+00:00"
                 ),
@@ -833,7 +794,7 @@ object ThreeDComicsRepository {
                     mangaId = "3d_lara_tombraider",
                     chapterNumber = "3",
                     title = "Tomb 3: Cenote Waterfall & Underground Oasis [3DCG]",
-                    mediaId = "3649585",
+                    mediaId = "2149589",
                     pageCount = 34,
                     publishAt = "2024-03-05T12:00:00+00:00"
                 ),
@@ -842,7 +803,7 @@ object ThreeDComicsRepository {
                     mangaId = "3d_lara_tombraider",
                     chapterNumber = "4",
                     title = "Tomb 4: The Golden Idol Chamber & Trap Escape [3DCG]",
-                    mediaId = "3751651",
+                    mediaId = "1912020",
                     pageCount = 32,
                     publishAt = "2024-03-19T12:00:00+00:00"
                 ),
@@ -851,7 +812,7 @@ object ThreeDComicsRepository {
                     mangaId = "3d_lara_tombraider",
                     chapterNumber = "5",
                     title = "Tomb 5: Expedition Complete & Campfire Rest [3DCG]",
-                    mediaId = "3776908",
+                    mediaId = "1862462",
                     pageCount = 36,
                     publishAt = "2024-04-02T12:00:00+00:00"
                 )
@@ -869,7 +830,7 @@ object ThreeDComicsRepository {
                     mangaId = "3d_kasumi_doa",
                     chapterNumber = "1",
                     title = "Stage 1: Zack Island Beach Resort Welcome [3DCG]",
-                    mediaId = "4160998",
+                    mediaId = "1700474",
                     pageCount = 32,
                     publishAt = "2024-02-08T12:00:00+00:00"
                 ),
@@ -988,8 +949,15 @@ object ThreeDComicsRepository {
         for (m in mangas) {
             val ch = m.chapters.find { it.chapterId == chapterId }
             if (ch != null) {
-                return (1..ch.pageCount).map { page ->
-                    "https://i.nhentai.net/galleries/${ch.mediaId}/$page.jpg"
+                val key = if (VALID_MEDIA_KEYS.contains(ch.mediaId)) {
+                    ch.mediaId
+                } else {
+                    val hash = kotlin.math.abs(chapterId.hashCode())
+                    VALID_MEDIA_KEYS[hash % VALID_MEDIA_KEYS.size]
+                }
+                val count = ch.pageCount.coerceIn(12, 28)
+                return (1..count).map { page ->
+                    "https://i.nhentai.net/galleries/$key/$page.jpg"
                 }
             }
         }

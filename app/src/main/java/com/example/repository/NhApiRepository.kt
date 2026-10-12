@@ -9,12 +9,11 @@ class NhApiRepository {
     companion object {
         val VERIFIED_MEDIA_KEYS = listOf(
             "876050", "1300710", "1783739", "2849391", "2849062",
-            "3412039", "754141", "2949057", "275789", "631775",
-            "277210", "3524108", "1700474", "1111486", "678619",
-            "2849381", "3649585", "964440", "3751651", "2999240",
-            "4160998", "1996892", "1975702", "1276626", "1870727",
-            "2149589", "1912020", "1803530", "1862462", "2019715",
-            "1428040", "3031776", "3776908", "1175545", "2022703"
+            "754141", "2949057", "275789", "631775", "277210",
+            "1700474", "1111486", "678619", "2849381", "1996892",
+            "1975702", "1276626", "1870727", "2149589", "1803530",
+            "1862462", "2019715", "1428040", "3031776", "1175545",
+            "2022703", "1748231", "2279150"
         )
 
         fun getMediaKey(id: String): String {
@@ -131,47 +130,7 @@ class NhApiRepository {
                 favorites = 43200
             ),
 
-            // === SINFUL LUST COMIC & ADULT WEBTOON SERIES ===
-            NhGallery(
-                id = "451290",
-                title = "[Studio Lust] Sinful Lust - The Secret Room [English] [Full Color]",
-                coverUrl = "https://t.nhentai.net/galleries/2498210/cover.jpg",
-                tags = listOf("sinful lust", "lust", "webtoon", "full color", "harem", "romance", "erotica", "drama"),
-                artist = "Studio Lust",
-                language = "english",
-                pageCount = 45,
-                favorites = 58900
-            ),
-            NhGallery(
-                id = "463410",
-                title = "[Studio Lust] Sinful Lust Season 2 - Midnight Desires [English] [Full Color]",
-                coverUrl = "https://t.nhentai.net/galleries/2560120/cover.jpg",
-                tags = listOf("sinful lust", "lust", "webtoon", "full color", "milf", "romance", "drama"),
-                artist = "Studio Lust",
-                language = "english",
-                pageCount = 48,
-                favorites = 63400
-            ),
-            NhGallery(
-                id = "472190",
-                title = "[Studio Lust] Sinful Lust - The Governess Special [English]",
-                coverUrl = "https://t.nhentai.net/galleries/2610450/cover.jpg",
-                tags = listOf("sinful lust", "maid", "milf", "erotica", "full color", "english", "vanilla"),
-                artist = "Studio Lust",
-                language = "english",
-                pageCount = 42,
-                favorites = 47800
-            ),
-            NhGallery(
-                id = "481020",
-                title = "[Studio Lust] Sinful Lust - Beach Resort Romance [English]",
-                coverUrl = "https://t.nhentai.net/galleries/2665120/cover.jpg",
-                tags = listOf("sinful lust", "swimsuit", "harem", "full color", "romance", "english"),
-                artist = "Studio Lust",
-                language = "english",
-                pageCount = 40,
-                favorites = 51200
-            ),
+
 
             // === URAKAN (Circle: Urakan Kensetsu) FULL CATALOG ===
             NhGallery(
@@ -456,26 +415,7 @@ class NhApiRepository {
                 pageCount = 38,
                 favorites = 41200
             ),
-            NhGallery(
-                id = "495120",
-                title = "[Studio Lust] Sinful Lust - Episode 1 to 5 Complete Omnibus [English] [Full Color]",
-                coverUrl = "https://t.nhentai.net/galleries/2754120/cover.jpg",
-                tags = listOf("sinful lust", "lust", "webtoon", "omnibus", "full color", "harem", "romance"),
-                artist = "Studio Lust",
-                language = "english",
-                pageCount = 56,
-                favorites = 68900
-            ),
-            NhGallery(
-                id = "498210",
-                title = "[Studio Lust] Sinful Lust Season 3 - Secret Rendezvous [English] [Full Color]",
-                coverUrl = "https://t.nhentai.net/galleries/2798210/cover.jpg",
-                tags = listOf("sinful lust", "lust", "webtoon", "full color", "milf", "romance", "drama"),
-                artist = "Studio Lust",
-                language = "english",
-                pageCount = 50,
-                favorites = 61200
-            ),
+
             NhGallery(
                 id = "431290",
                 title = "[Urakan] Kanojo x Kanojo x Kanojo 5 - Pajama Party [English]",

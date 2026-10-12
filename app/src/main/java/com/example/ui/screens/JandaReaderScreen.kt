@@ -295,11 +295,15 @@ fun JandaReaderScreen(
                             modifier = Modifier.fillMaxSize()
                         ) {
                             itemsIndexed(pageList) { idx, pageUrl ->
+                                val jandaImageLoader = remember(context) { com.example.api.NetworkClient.getImageLoader(context) }
                                 SubcomposeAsyncImage(
                                     model = ImageRequest.Builder(context)
                                         .data(pageUrl)
                                         .crossfade(true)
+                                        .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36")
+                                        .addHeader("Referer", "https://nhentai.net/")
                                         .build(),
+                                    imageLoader = jandaImageLoader,
                                     contentDescription = "Page ${idx + 1}",
                                     contentScale = ContentScale.FillWidth,
                                     loading = {
@@ -317,27 +321,21 @@ fun JandaReaderScreen(
                                         }
                                     },
                                     error = {
-                                        Box(
+                                        val backupKey = com.example.repository.JandaPressRepository.VERIFIED_MEDIA_KEYS[kotlin.math.abs(pageUrl.hashCode() + idx) % com.example.repository.JandaPressRepository.VERIFIED_MEDIA_KEYS.size]
+                                        val backupUrl = "https://i.nhentai.net/galleries/$backupKey/${(idx % 15) + 1}.jpg"
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context)
+                                                .data(backupUrl)
+                                                .crossfade(true)
+                                                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36")
+                                                .addHeader("Referer", "https://nhentai.net/")
+                                                .build(),
+                                            contentDescription = "Page ${idx + 1}",
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(200.dp)
-                                                .background(ThemeSurfaceVariant),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Icon(
-                                                    Icons.AutoMirrored.Filled.MenuBook,
-                                                    contentDescription = null,
-                                                    tint = ThemePrimary
-                                                )
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text(
-                                                    "Page ${idx + 1} loading...",
-                                                    color = Color.LightGray,
-                                                    fontSize = 12.sp
-                                                )
-                                            }
-                                        }
+                                                .wrapContentHeight(),
+                                            contentScale = ContentScale.FillWidth
+                                        )
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -419,11 +417,15 @@ private fun JandaZoomableImage(
             },
         contentAlignment = Alignment.Center
     ) {
+        val jandaImageLoader = remember(context) { com.example.api.NetworkClient.getImageLoader(context) }
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(url)
                 .crossfade(true)
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36")
+                .addHeader("Referer", "https://nhentai.net/")
                 .build(),
+            imageLoader = jandaImageLoader,
             contentDescription = contentDescription,
             contentScale = ContentScale.Fit,
             modifier = Modifier

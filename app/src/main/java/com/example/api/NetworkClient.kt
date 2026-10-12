@@ -177,8 +177,11 @@ object NetworkClient {
 
             val reqBuilder = original.newBuilder()
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
-                .header("Accept", "image/webp,image/png,image/jpeg,image/*,*/*;q=0.8")
-                .header("Accept-Language", "en-US,en;q=0.9")
+            
+            if (original.header("Accept") == null) {
+                reqBuilder.header("Accept", "image/webp,image/png,image/jpeg,image/*,*/*;q=0.8")
+            }
+            reqBuilder.header("Accept-Language", "en-US,en;q=0.9")
 
             when {
                 host.contains("nhentai") || host.contains("cubari") -> {
@@ -268,8 +271,8 @@ object NetworkClient {
 
             try {
                 val directChain = if (isCdnImage) {
-                    chain.withConnectTimeout(3500, TimeUnit.MILLISECONDS)
-                        .withReadTimeout(8, TimeUnit.SECONDS)
+                    chain.withConnectTimeout(5000, TimeUnit.MILLISECONDS)
+                        .withReadTimeout(10, TimeUnit.SECONDS)
                 } else {
                     chain
                 }
@@ -279,14 +282,14 @@ object NetworkClient {
                 }
             } catch (e: Exception) {
                 requestException = e
-                if (isCdnImage) {
+                if (isCdnImage && (e is java.net.ConnectException || e is java.net.UnknownHostException)) {
                     blockedDirectHosts.add(host)
                 }
             }
 
-            // High-reliability edge proxy fallback for CDN images (covers 403, 404, 502, ISP blocking, DNS tampering)
-            if (isCdnImage) {
-                blockedDirectHosts.add(host)
+            // High-reliability edge proxy fallback for CDN images (covers 403, 502, 503, connection errors)
+            // Note: 404 means the file does not exist on the server; do NOT poison blocked hosts list on 404
+            if (isCdnImage && (response == null || response.code in listOf(403, 502, 503))) {
                 tryPhoton()?.let {
                     response?.close()
                     return@addInterceptor it

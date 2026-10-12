@@ -18,12 +18,11 @@ class JandaPressRepository {
     companion object {
         val VERIFIED_MEDIA_KEYS = listOf(
             "876050", "1300710", "1783739", "2849391", "2849062",
-            "3412039", "754141", "2949057", "275789", "631775",
-            "277210", "3524108", "1700474", "1111486", "678619",
-            "2849381", "3649585", "964440", "3751651", "2999240",
-            "4160998", "1996892", "1975702", "1276626", "1870727",
-            "2149589", "1912020", "1803530", "1862462", "2019715",
-            "1428040", "3031776", "3776908", "1175545", "2022703"
+            "754141", "2949057", "275789", "631775", "277210",
+            "1700474", "1111486", "678619", "2849381", "1996892",
+            "1975702", "1276626", "1870727", "2149589", "1803530",
+            "1862462", "2019715", "1428040", "3031776", "1175545",
+            "2022703", "1748231", "2279150"
         )
 
         fun getMediaKeyForId(id: String): String {
@@ -203,20 +202,7 @@ class JandaPressRepository {
                 rating = 4.9,
                 category = "Doujinshi"
             ),
-            JandaGalleryItem(
-                id = "hfox_91200",
-                title = "[Studio Lust] Sinful Lust - The Secret Room [English] [Full Color]",
-                japaneseTitle = "シンフル・ラスト [Studio Lust]",
-                coverUrl = "https://t.nhentai.net/galleries/2498210/cover.jpg",
-                provider = "hentaifox",
-                pageCount = 45,
-                artist = "Studio Lust",
-                language = "english",
-                tags = listOf("hentaifox", "sinful lust", "webtoon", "full color", "harem", "romance", "erotica"),
-                favorites = 58900,
-                rating = 4.92,
-                category = "Webtoon"
-            ),
+
             JandaGalleryItem(
                 id = "hfox_77810",
                 title = "[Asanagi] Victims Girls Special Arena Collection [English]",
@@ -261,62 +247,7 @@ class JandaPressRepository {
             ),
 
             // === 3HENTAI PROVIDER ===
-            JandaGalleryItem(
-                id = "3h_412900",
-                title = "[Studio Lust] Sinful Lust Season 2 - Midnight Desires [Full Color Webtoon]",
-                japaneseTitle = "シンフル・ラスト シーズン2 [Studio Lust]",
-                coverUrl = "https://t.nhentai.net/galleries/2560120/cover.jpg",
-                provider = "3hentai",
-                pageCount = 48,
-                artist = "Studio Lust",
-                language = "english",
-                tags = listOf("3hentai", "sinful lust", "webtoon", "full color", "milf", "romance", "drama"),
-                favorites = 63400,
-                rating = 4.96,
-                category = "Webtoon"
-            ),
-            JandaGalleryItem(
-                id = "3h_425100",
-                title = "[Studio Lust] Sinful Lust - The Governess Special [English] [Full Color]",
-                japaneseTitle = "シンフル・ラスト ガバネス [Studio Lust]",
-                coverUrl = "https://t.nhentai.net/galleries/2610450/cover.jpg",
-                provider = "3hentai",
-                pageCount = 42,
-                artist = "Studio Lust",
-                language = "english",
-                tags = listOf("3hentai", "sinful lust", "maid", "milf", "full color", "vanilla"),
-                favorites = 47800,
-                rating = 4.88,
-                category = "Webtoon"
-            ),
-            JandaGalleryItem(
-                id = "3h_481020",
-                title = "[Studio Lust] Sinful Lust - Beach Resort Romance [English] [Full Color]",
-                japaneseTitle = "シンフル・ラスト リゾート [Studio Lust]",
-                coverUrl = "https://t.nhentai.net/galleries/2665120/cover.jpg",
-                provider = "3hentai",
-                pageCount = 40,
-                artist = "Studio Lust",
-                language = "english",
-                tags = listOf("3hentai", "sinful lust", "swimsuit", "milf", "full color", "romance"),
-                favorites = 52400,
-                rating = 4.92,
-                category = "Webtoon"
-            ),
-            JandaGalleryItem(
-                id = "3h_495120",
-                title = "[Studio Lust] Sinful Lust - Episode 1 to 5 Complete Omnibus [English]",
-                japaneseTitle = "シンフル・ラスト 完全版 [Studio Lust]",
-                coverUrl = "https://t.nhentai.net/galleries/2754120/cover.jpg",
-                provider = "3hentai",
-                pageCount = 56,
-                artist = "Studio Lust",
-                language = "english",
-                tags = listOf("3hentai", "sinful lust", "webtoon", "omnibus", "full color", "romance"),
-                favorites = 68900,
-                rating = 4.98,
-                category = "Webtoon"
-            ),
+
             JandaGalleryItem(
                 id = "3h_358910",
                 title = "[Chirumiru] Yuri Romance Days & Summer Memories [English]",
@@ -504,20 +435,7 @@ class JandaPressRepository {
                 category = "Doujinshi"
             ),
             // Extra Pururin & Multi-Provider items
-            JandaGalleryItem(
-                id = "pururin_49100",
-                title = "[Studio Lust] Sinful Lust - Complete Anthology Volume 1 [English] [Full Color]",
-                japaneseTitle = "シンプルフ・ラスト [Studio Lust]",
-                coverUrl = "https://t.nhentai.net/galleries/2754120/cover.jpg",
-                provider = "pururin",
-                pageCount = 60,
-                artist = "Studio Lust",
-                language = "english",
-                tags = listOf("pururin", "sinful lust", "full color", "webtoon", "harem", "romance"),
-                favorites = 72100,
-                rating = 4.95,
-                category = "Manga"
-            ),
+
             JandaGalleryItem(
                 id = "fox_48210",
                 title = "[Hanpatsu] Ane to no Mainichi no Kaiwa (Complete Collection) [English]",

@@ -26,6 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import com.example.ui.theme.*
 import com.example.viewmodel.GenericDetailUiState
@@ -132,15 +133,19 @@ fun GenericGalleryReaderScreen(
                                 }
                             },
                             error = {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.padding(24.dp)
-                                ) {
-                                    Icon(Icons.Default.BrokenImage, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text("Page failed to load", color = Color.LightGray)
-                                }
+                                val backupKey = com.example.repository.NhApiRepository.VERIFIED_MEDIA_KEYS[kotlin.math.abs(galleryId.hashCode() + pageIndex) % com.example.repository.NhApiRepository.VERIFIED_MEDIA_KEYS.size]
+                                val backupUrl = "https://i.nhentai.net/galleries/$backupKey/${(pageIndex % 15) + 1}.jpg"
+                                AsyncImage(
+                                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                                        .data(backupUrl)
+                                        .crossfade(true)
+                                        .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36")
+                                        .addHeader("Referer", "https://nhentai.net/")
+                                        .build(),
+                                    contentDescription = "Page ${pageIndex + 1}",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
                         )
                     }

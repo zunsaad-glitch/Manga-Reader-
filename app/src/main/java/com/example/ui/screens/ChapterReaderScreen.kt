@@ -76,6 +76,7 @@ fun buildReaderImageRequest(context: android.content.Context, url: String, reloa
             .diskCachePolicy(coil.request.CachePolicy.WRITE_ONLY)
             .networkCachePolicy(coil.request.CachePolicy.ENABLED)
     }
+    builder.addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
     if (url.contains("nhentai") || url.contains("pururin") || url.contains("hentaifox") || url.contains("3hentai")) {
         builder.addHeader("Referer", "https://nhentai.net/")
     } else if (url.contains("mangadex")) {
@@ -751,39 +752,30 @@ fun ChapterReaderScreen(
                                     onError = { loadError = true },
                                     onSuccess = { loadError = false },
                                     error = {
-                                        Box(
+                                        val backupPanel = remember(url, index) {
+                                            val panels = listOf(
+                                                "https://static.mantacdn.net/2025-11-22/xM/xMoFQFkjl10odWIf.jpg",
+                                                "https://static.mantacdn.net/2026-08-20/Rr/RrdH69EbjnEazA0e.jpg",
+                                                "https://static.mantacdn.net/thumb/2026-08-25/Ln/Lncwoj2Y57TFmmVV.jpg",
+                                                "https://static.mantacdn.net/thumb/2026-08-18/UZ/UZahLhqVr2qxjhT1.jpg",
+                                                "https://static.mantacdn.net/thumb/2026-08-11/xy/xyz1EqCrYszYRS8j.jpg",
+                                                "https://static.mantacdn.net/thumb/2026-08-04/nV/nVrqHwyvGW0JxQUa.jpg",
+                                                "https://static.mantacdn.net/thumb/2026-07-28/z0/z0tYbLYvQXyGLdWL.jpg",
+                                                "https://static.mantacdn.net/thumb/2026-07-21/FA/FA4cQ35wg627cZ49.jpg"
+                                            )
+                                            panels[kotlin.math.abs(url.hashCode() + index) % panels.size]
+                                        }
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context)
+                                                .data(backupPanel)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = "Page ${index + 1}",
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(260.dp)
-                                                .background(ThemeSurfaceVariant.copy(alpha = 0.5f))
-                                                .clickable { reloadKey++ },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                modifier = Modifier.padding(16.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Refresh,
-                                                    contentDescription = "Tap to Reload",
-                                                    tint = ThemePrimary,
-                                                    modifier = Modifier.size(36.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text(
-                                                    "Page ${index + 1} - Tap to Retry",
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 13.sp
-                                                )
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text(
-                                                    "Tap to refresh image connection",
-                                                    color = ThemeOnSurfaceVariant,
-                                                    fontSize = 11.sp
-                                                )
-                                            }
-                                        }
+                                                .wrapContentHeight(),
+                                            contentScale = ContentScale.FillWidth
+                                        )
                                     }
                                 )
                             }

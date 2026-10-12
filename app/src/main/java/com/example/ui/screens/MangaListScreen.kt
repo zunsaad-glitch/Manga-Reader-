@@ -427,6 +427,7 @@ fun MangaListScreen(
                     ),
                     modifier = Modifier.testTag("nav_search")
                 )
+
                 NavigationBarItem(
                     selected = currentTab == AppTab.LIBRARY,
                     onClick = { viewModel.setTab(AppTab.LIBRARY) },
@@ -1420,7 +1421,7 @@ fun HomeScreenContent(
             item {
                 SectionHeader(
                     title = "🌈 Full Color Manga & Webtoons",
-                    subtitle = "Solo Leveling, Secret Class, Bleach Colored, Sinful Lust & Vivid Masterpieces"
+                    subtitle = "Solo Leveling, Secret Class, Bleach Colored, Lookism & Vivid Masterpieces"
                 )
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
@@ -1456,7 +1457,7 @@ fun HomeScreenContent(
             item {
                 SectionHeader(
                     title = "🔞 Adult 18+ Webtoons & Manhwa",
-                    subtitle = "Secret Class, Boarding Diary, Stepmother Friends, Sinful Lust & Adult Hits"
+                    subtitle = "Secret Class, Boarding Diary, Stepmother Friends & Adult Webtoon Hits"
                 )
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
@@ -1527,8 +1528,8 @@ fun HomeScreenContent(
         if (parodyMangasList.isNotEmpty()) {
             item {
                 SectionHeader(
-                    title = "🎭 18+ Anime & Gaming Parodies",
-                    subtitle = "Naruto, Fate/Grand Order, Genshin Impact, One Piece, Bleach & Hololive Parodies"
+                    title = "🎭 Fan & Gaming Parodies",
+                    subtitle = "Popular culture, gaming, and character doujinshi parodies"
                 )
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),

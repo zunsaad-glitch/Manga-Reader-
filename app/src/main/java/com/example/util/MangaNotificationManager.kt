@@ -148,12 +148,12 @@ object MangaNotificationManager {
         )
     }
 
-    suspend fun showAdultDropNotification(context: Context, title: String = "Sinful Lust") {
+    suspend fun showAdultDropNotification(context: Context, title: String = "Secret Class") {
         showMangaDropNotification(
             context = context,
-            mangaId = "451290",
+            mangaId = "b8451167-73ec-47eb-a836-8a03a749eb35",
             mangaTitle = title,
-            chapterTitle = "Episode 42 - Uncensored Secret Encounter [NEW 18+ DROP]",
+            chapterTitle = "Episode 42 - New Chapter Release [NEW 18+ DROP]",
             coverUrl = null,
             isSubscribed = true
         )

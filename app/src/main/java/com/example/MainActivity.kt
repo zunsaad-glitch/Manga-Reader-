@@ -26,14 +26,46 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.example.data.SettingsRepository
 
+import java.io.File
+
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        init {
+            try {
+                android.system.Os.setenv("LIBGL_ALWAYS_SOFTWARE", "1", true)
+            } catch (_: Exception) {}
+        }
+    }
 
     private val requestNotificationLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        try {
+            android.system.Os.setenv("LIBGL_ALWAYS_SOFTWARE", "1", true)
+        } catch (_: Exception) {}
+
         super.onCreate(savedInstanceState)
+
+        // Pre-create WebView and Chromium cache directories to prevent simple_file_enumerator opendir errors
+        try {
+            val webViewCacheDirs = listOf(
+                File(cacheDir, "WebView/Default/HTTP Cache/Code Cache/js"),
+                File(cacheDir, "WebView/Default/HTTP Cache/Code Cache/wasm"),
+                File(cacheDir, "WebView/Default/HTTP Cache"),
+                File(cacheDir, "WebView/Default/Code Cache/js"),
+                File(cacheDir, "WebView/Default/Code Cache/wasm")
+            )
+            for (dir in webViewCacheDirs) {
+                if (!dir.exists()) {
+                    dir.mkdirs()
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore directory creation errors
+        }
 
         // Initialize Notification Channels
         MangaNotificationManager.initChannels(applicationContext)

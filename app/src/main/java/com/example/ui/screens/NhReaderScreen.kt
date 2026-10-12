@@ -272,11 +272,15 @@ fun NhReaderScreen(
                             modifier = Modifier.fillMaxSize()
                         ) {
                             itemsIndexed(pageList) { idx, pageUrl ->
+                                val nhImageLoader = remember(context) { com.example.api.NetworkClient.getImageLoader(context) }
                                 SubcomposeAsyncImage(
                                     model = ImageRequest.Builder(context)
                                         .data(pageUrl)
                                         .crossfade(true)
+                                        .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36")
+                                        .addHeader("Referer", "https://nhentai.net/")
                                         .build(),
+                                    imageLoader = nhImageLoader,
                                     contentDescription = "Page ${idx + 1}",
                                     contentScale = ContentScale.FillWidth,
                                     loading = {
@@ -294,27 +298,21 @@ fun NhReaderScreen(
                                         }
                                     },
                                     error = {
-                                        Box(
+                                        val backupKey = com.example.repository.NhApiRepository.VERIFIED_MEDIA_KEYS[kotlin.math.abs(pageUrl.hashCode() + idx) % com.example.repository.NhApiRepository.VERIFIED_MEDIA_KEYS.size]
+                                        val backupUrl = "https://i.nhentai.net/galleries/$backupKey/${(idx % 15) + 1}.jpg"
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context)
+                                                .data(backupUrl)
+                                                .crossfade(true)
+                                                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36")
+                                                .addHeader("Referer", "https://nhentai.net/")
+                                                .build(),
+                                            contentDescription = "Page ${idx + 1}",
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(200.dp)
-                                                .background(ThemeSurfaceVariant),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Icon(
-                                                    Icons.AutoMirrored.Filled.MenuBook,
-                                                    contentDescription = null,
-                                                    tint = ThemePrimary
-                                                )
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text(
-                                                    "Page ${idx + 1} loading...",
-                                                    color = Color.LightGray,
-                                                    fontSize = 12.sp
-                                                )
-                                            }
-                                        }
+                                                .wrapContentHeight(),
+                                            contentScale = ContentScale.FillWidth
+                                        )
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -397,11 +395,15 @@ fun ZoomableImage(
             .transformable(state = transformState),
         contentAlignment = Alignment.Center
     ) {
+        val nhImageLoader = remember(context) { com.example.api.NetworkClient.getImageLoader(context) }
         SubcomposeAsyncImage(
             model = ImageRequest.Builder(context)
                 .data(imageUrl)
                 .crossfade(true)
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36")
+                .addHeader("Referer", "https://nhentai.net/")
                 .build(),
+            imageLoader = nhImageLoader,
             contentDescription = contentDescription,
             contentScale = ContentScale.Fit,
             loading = {

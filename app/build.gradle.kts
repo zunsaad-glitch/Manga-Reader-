@@ -97,6 +97,11 @@ dependencies {
     implementation(libs.okhttp.dnsoverhttps)
     implementation(libs.retrofit)
     implementation("org.jsoup:jsoup:1.18.3")
+    // Unused video playback dependencies commented out for APK size optimization
+    // implementation("androidx.media3:media3-exoplayer:1.4.1")
+    // implementation("androidx.media3:media3-ui:1.4.1")
+    // implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
+    // implementation("com.pierfrancescosoffritti.androidyoutubeplayer:core:12.1.1")
 
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.androidx.core.ktx)

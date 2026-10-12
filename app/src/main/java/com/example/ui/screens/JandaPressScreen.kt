@@ -49,7 +49,7 @@ import com.example.viewmodel.JandaSubTab
 import com.example.viewmodel.JandaUiState
 
 private val JANDA_POPULAR_TAGS = listOf(
-    "3d", "ecchi", "3d comic", "pururin", "hentaifox", "3hentai", "hanpatsu", "urakan", "sinful lust", "big sister",
+    "3d", "ecchi", "3d comic", "pururin", "hentaifox", "3hentai", "hanpatsu", "urakan", "big sister",
     "doujinshi", "full color", "romance", "vanilla", "milf", "schoolgirl", "maid", "cosplay", "harem", "yuri"
 )
 
