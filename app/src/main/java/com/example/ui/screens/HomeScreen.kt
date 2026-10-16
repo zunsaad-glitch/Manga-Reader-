@@ -63,12 +63,12 @@ fun HomeScreen(
         gridState.scrollToItem(0)
     }
 
-    // Predictive infinite scroll: trigger prefetching 8 items before the bottom
-    val shouldLoadMore by remember {
+    // Predictive infinite scroll: trigger prefetching when user scrolls near the bottom of loaded mangas
+    val shouldLoadMore by remember(mangas.size) {
         derivedStateOf {
             val totalItems = gridState.layoutInfo.totalItemsCount
             val lastVisibleItem = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            totalItems > 0 && lastVisibleItem >= totalItems - 8
+            mangas.isNotEmpty() && totalItems > 8 && lastVisibleItem >= totalItems - 6
         }
     }
 

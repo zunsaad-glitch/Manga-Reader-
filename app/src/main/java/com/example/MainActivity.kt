@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
                 .crossfade(true)
                 .build()
             coil.Coil.setImageLoader(imageLoader)
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {}
 
         setContent {
             MangaVerseTheme {

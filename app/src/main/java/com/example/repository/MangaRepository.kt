@@ -293,7 +293,38 @@ class MangaRepository {
                 if (!jsonBody.isNullOrBlank()) {
                     val root = JSONObject(jsonBody)
                     val data = root.optJSONArray("data") ?: JSONArray()
-                    return parseMangaArray(data, source)
+                    val primaryResults = parseMangaArray(data, source)
+                    if (primaryResults.isNotEmpty()) {
+                        return primaryResults
+                    }
+                }
+            }
+
+            // Seamless Expansion: If provider-specific language restriction (e.g. ManhwaToon ko = 56 titles)
+            // runs out of titles for a specific tag or query, seamlessly expand to the global catalog
+            // so the user enjoys infinite, never-ending scrolling (thousands of titles)!
+            if (source != MangaSource.ALL) {
+                val expandedBuilder = urlBuilder.build().newBuilder()
+                    .removeAllQueryParameters("originalLanguage[]")
+                val expandedOffset = (page - 1) * limit
+                expandedBuilder.setQueryParameter("offset", expandedOffset.toString())
+
+                val expandedRequest = Request.Builder()
+                    .url(expandedBuilder.build())
+                    .header("User-Agent", "MangaVerse-Android-App/1.0")
+                    .build()
+
+                val expandedResponse = client.newCall(expandedRequest).execute()
+                if (expandedResponse.isSuccessful) {
+                    val expJsonBody = expandedResponse.body?.string()
+                    if (!expJsonBody.isNullOrBlank()) {
+                        val expRoot = JSONObject(expJsonBody)
+                        val expData = expRoot.optJSONArray("data") ?: JSONArray()
+                        val expandedResults = parseMangaArray(expData, source)
+                        if (expandedResults.isNotEmpty()) {
+                            return expandedResults
+                        }
+                    }
                 }
             }
         } catch (_: Exception) {

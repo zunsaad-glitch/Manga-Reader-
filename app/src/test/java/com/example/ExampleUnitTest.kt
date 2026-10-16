@@ -53,4 +53,10 @@ class ExampleUnitTest {
         // Initially null before network call
         org.junit.Assert.assertNull(cached)
     }
+
+    @Test
+    fun testViewModelConstructorReflection() {
+        val constructor = com.example.viewmodel.MainViewModel::class.java.getConstructor(android.app.Application::class.java)
+        assertNotNull(constructor)
+    }
 }

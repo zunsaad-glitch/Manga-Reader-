@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
-class MainViewModel(
+class MainViewModel @JvmOverloads constructor(
     application: Application,
     private val repository: MangaRepository = MangaRepository()
 ) : AndroidViewModel(application) {
@@ -499,9 +499,9 @@ class MainViewModel(
     }
 
     private fun loadPersistedBookmarks(): Map<String, Manga> {
-        val jsonStr = prefs.getString("bookmarked_mangas_json", null) ?: return emptyMap()
         val map = mutableMapOf<String, Manga>()
         try {
+            val jsonStr = prefs.getString("bookmarked_mangas_json", null) ?: return emptyMap()
             val arr = JSONArray(jsonStr)
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
@@ -521,7 +521,7 @@ class MainViewModel(
                     status = obj.optString("status", "Ongoing"),
                     synopsis = obj.optString("synopsis", ""),
                     genres = if (genresList.isNotEmpty()) genresList else listOf("Action"),
-                    source = try { MangaSource.valueOf(obj.optString("source", "ALL")) } catch (_: Exception) { MangaSource.ALL },
+                    source = try { MangaSource.valueOf(obj.optString("source", "ALL")) } catch (_: Throwable) { MangaSource.ALL },
                     totalChapters = obj.optInt("totalChapters", 100),
                     isTrending = obj.optBoolean("isTrending", false),
                     isEditorPick = obj.optBoolean("isEditorPick", false),
@@ -530,7 +530,7 @@ class MainViewModel(
                 )
                 map[manga.id] = manga
             }
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {}
         return map
     }
 
@@ -558,13 +558,13 @@ class MainViewModel(
                 arr.put(obj)
             }
             prefs.edit().putString("bookmarked_mangas_json", arr.toString()).apply()
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {}
     }
 
     private fun loadPersistedReadingHistory(): List<ReadingProgress> {
-        val jsonStr = prefs.getString("reading_history_json", null) ?: return emptyList()
         val list = mutableListOf<ReadingProgress>()
         try {
+            val jsonStr = prefs.getString("reading_history_json", null) ?: return emptyList()
             val arr = JSONArray(jsonStr)
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
@@ -573,7 +573,7 @@ class MainViewModel(
                         mangaId = obj.getString("mangaId"),
                         mangaTitle = obj.getString("mangaTitle"),
                         coverUrl = obj.getString("coverUrl"),
-                        source = try { MangaSource.valueOf(obj.optString("source", "ALL")) } catch (_: Exception) { MangaSource.ALL },
+                        source = try { MangaSource.valueOf(obj.optString("source", "ALL")) } catch (_: Throwable) { MangaSource.ALL },
                         lastChapter = obj.optDouble("lastChapter", 1.0).toFloat(),
                         lastPage = obj.optInt("lastPage", 1),
                         totalPages = obj.optInt("totalPages", 1),
@@ -581,7 +581,7 @@ class MainViewModel(
                     )
                 )
             }
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {}
         return list
     }
 
