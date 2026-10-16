@@ -1,8 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/manga_app_icon_1787460122032"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Book Spine & Open Manga Pages -->
+    <path
+        android:fillColor="#FF2A6D"
+        android:pathData="M30,34 L54,42 L54,78 L30,70 Z" />
+    <path
+        android:fillColor="#05D9E8"
+        android:pathData="M78,34 L54,42 L54,78 L78,70 Z" />
+    <!-- Center lightning / spark -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,26 L56,26 L53,38 L58,38 L50,56 L53,44 L48,44 Z" />
+</vector>

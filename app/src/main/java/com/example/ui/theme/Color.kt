@@ -2,26 +2,26 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Luxury Midnight Twilight Palette
-val ThemeBackground = Color(0xFF0F0C15)
-val ThemeOnBackground = Color(0xFFF3F0F7)
-val ThemeSurface = Color(0xFF171320)
-val ThemeOnSurface = Color(0xFFEDE8F5)
-val ThemeSurfaceVariant = Color(0xFF231C2E)
-val ThemeOnSurfaceVariant = Color(0xFFA59CB0)
-val ThemeOutline = Color(0xFF382F45)
-val ThemeNavBar = Color(0xFF130F1A)
+// Premium Dark Theme Palette for MangaVerse
+val DarkBackground = Color(0xFF090A10)
+val DarkSurface = Color(0xFF131520)
+val DarkSurfaceVariant = Color(0xFF1C1F30)
+val DarkSurfaceElevated = Color(0xFF24273D)
 
-val ThemePrimary = Color(0xFFFF597B)
-val ThemeOnPrimary = Color(0xFFFFFFFF)
-val ThemeSecondary = Color(0xFFB39DDB)
-val ThemeOnSecondary = Color(0xFF1E1430)
+// Neon & Vibrant Accents
+val NeonAccent = Color(0xFFFF2A6D)        // Vivid Cyber Pink / Coral
+val ElectricPurple = Color(0xFF7C4DFF)     // Deep Cyber Violet
+val NeonCyan = Color(0xFF05D9E8)           // Cyan highlight
+val NeonMint = Color(0xFF00F5A0)           // Mint for success / rating
+val AmberGold = Color(0xFFFFB300)          // Star rating gold
 
-val AccentRose = Color(0xFFFF4E75)
-val AccentCoral = Color(0xFFFF6584)
-val AccentPurple = Color(0xFF9D4EDD)
-val AccentGold = Color(0xFFFFB703)
+// Text Colors
+val TextPrimary = Color(0xFFF6F7FB)
+val TextSecondary = Color(0xFFA0A5C0)
+val TextTertiary = Color(0xFF6B7294)
 
-val MatureBadgeBg = Color(0xFFFF4757)
-val SafeBadgeBg = Color(0xFF2ED573)
-val CardBorder = Color(0x33A59CB0)
+// Source Badge Colors
+val MangaDexColor = Color(0xFFFF6740)
+val ManhwaToonColor = Color(0xFF7C4DFF)
+val MangaToonColor = Color(0xFF00C853)
+val MantaColor = Color(0xFF00B0FF)

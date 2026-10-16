@@ -1,6 +1,8 @@
 {
-  "name": "Manga Reader",
-  "description": "An all-in-one Android manga and manhwa reader app supporting Manta, MangaToon, ManhwaToon, MangaDex, custom reading modes, offline library, and unified search.",
+  "name": "MangaVerse",
+  "description": "Premium Manga & Manhwa reader with infinite scroll across MangaDex, ManhwaToon, MangaToon, and Manta, tag filtering, and immersive reader experience.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
