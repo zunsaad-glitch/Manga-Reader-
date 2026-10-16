@@ -8,6 +8,27 @@ enum class MangaSource(val displayName: String) {
     MANTA("Manta")
 }
 
+enum class MangaVariety(val id: String, val displayName: String, val badge: String) {
+    ALL_POPULAR("popular", "Trending Hits", "🔥"),
+    TOP_RATED("top_rated", "Top Rated", "⭐"),
+    LATEST_UPDATES("latest", "Latest Updates", "⚡"),
+    COMPLETED("completed", "Completed Series", "✅"),
+    MANHWA("manhwa", "Korean Webtoons", "🇰🇷"),
+    MANHUA("manhua", "Chinese Manhua", "🇨🇳"),
+    ROMANCE("romance", "Romance & Drama", "💖"),
+    ISEKAI("isekai", "Isekai & Fantasy", "🌀"),
+    ACTION("action", "Action & Martial Arts", "⚔️"),
+    PSYCHOLOGICAL("psychological", "Psychological Thrillers", "🧠"),
+    DARK_FANTASY("dark_fantasy", "Dark Fantasy & Horror", "💀"),
+    COMEDY("comedy", "Comedy & Fun", "😂"),
+    SLICE_OF_LIFE("slice_of_life", "Slice of Life", "☕"),
+    SCI_FI("sci_fi", "Sci-Fi & Cyberpunk", "🚀"),
+    MARTIAL_ARTS("martial_arts", "Martial Arts & Cultivation", "🥋"),
+    MYSTERY("mystery", "Mystery & Detective", "🔍"),
+    SUPERNATURAL("supernatural", "Supernatural & Magic", "🔮"),
+    SPORTS("sports", "Sports & Shounen", "⚽")
+}
+
 enum class ContentRating(val apiValue: String, val label: String) {
     SAFE("safe", "Safe"),
     SUGGESTIVE("suggestive", "Suggestive"),

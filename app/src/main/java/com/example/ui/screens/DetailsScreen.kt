@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,6 +40,8 @@ fun DetailsScreen(
     chapters: List<Chapter>,
     isChaptersLoading: Boolean,
     isBookmarked: Boolean,
+    isAscending: Boolean = true,
+    onToggleOrder: () -> Unit = {},
     onBackClick: () -> Unit,
     onBookmarkToggle: () -> Unit,
     onChapterClick: (Chapter) -> Unit,
@@ -46,6 +49,14 @@ fun DetailsScreen(
     modifier: Modifier = Modifier
 ) {
     var isSynopsisExpanded by remember { mutableStateOf(false) }
+
+    val displayedChapters = remember(chapters, isAscending) {
+        if (isAscending) {
+            chapters.sortedBy { it.chapterNumber }
+        } else {
+            chapters.sortedByDescending { it.chapterNumber }
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize().background(DarkBackground)) {
         LazyColumn(
@@ -283,7 +294,7 @@ fun DetailsScreen(
                 }
             }
 
-            // Chapters Header
+            // Chapters Header with Sort Order Toggle
             item {
                 Row(
                     modifier = Modifier
@@ -298,12 +309,34 @@ fun DetailsScreen(
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    if (!isChaptersLoading) {
-                        Text(
-                            text = "Latest to Oldest",
-                            color = TextTertiary,
-                            fontSize = 12.sp
-                        )
+                    if (!isChaptersLoading && chapters.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = DarkSurfaceElevated,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onToggleOrder() }
+                                .testTag("toggle_chapter_sequence_btn")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SwapVert,
+                                    contentDescription = "Change Sequence Order",
+                                    tint = NeonAccent,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = if (isAscending) "Ch. 1 → Last (Ascending)" else "Latest → Ch. 1 (Descending)",
+                                    color = NeonAccent,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -336,8 +369,8 @@ fun DetailsScreen(
                 }
             }
 
-            // Chapters List
-            items(chapters, key = { it.id }) { chapter ->
+            // Chapters List sorted by user's chosen sequence
+            items(displayedChapters, key = { it.id }) { chapter ->
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -384,8 +417,8 @@ fun DetailsScreen(
             }
         }
 
-        // Bottom CTA Button: Start Reading
-        val firstChapter = chapters.lastOrNull() ?: chapters.firstOrNull()
+        // Bottom CTA Button: Start Reading (starts at Chapter 1 / lowest chapter number)
+        val firstChapter = chapters.minByOrNull { it.chapterNumber } ?: chapters.firstOrNull()
         if (firstChapter != null) {
             Surface(
                 color = DarkSurfaceElevated,

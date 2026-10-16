@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.model.Chapter
 import com.example.model.Manga
+import com.example.model.MangaVariety
 import com.example.ui.screens.*
 import com.example.ui.theme.*
 import com.example.viewmodel.MainViewModel
@@ -72,6 +73,7 @@ fun MainAppContent(viewModel: MainViewModel) {
 
     val mangas by viewModel.mangas.collectAsStateWithLifecycle()
     val selectedSource by viewModel.selectedSource.collectAsStateWithLifecycle()
+    val selectedVariety by viewModel.selectedVariety.collectAsStateWithLifecycle()
     val selectedTag by viewModel.selectedTag.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val selectedContentRatings by viewModel.selectedContentRatings.collectAsStateWithLifecycle()
@@ -81,6 +83,7 @@ fun MainAppContent(viewModel: MainViewModel) {
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val continueReadingList by viewModel.continueReadingList.collectAsStateWithLifecycle()
     val bookmarkedIds by viewModel.bookmarkedMangaIds.collectAsStateWithLifecycle()
+    val bookmarkedMangasMap by viewModel.bookmarkedMangas.collectAsStateWithLifecycle()
 
     val selectedManga by viewModel.selectedManga.collectAsStateWithLifecycle()
     val selectedMangaChapters by viewModel.selectedMangaChapters.collectAsStateWithLifecycle()
@@ -88,6 +91,7 @@ fun MainAppContent(viewModel: MainViewModel) {
     val activeChapter by viewModel.activeChapter.collectAsStateWithLifecycle()
     val activeReaderManga by viewModel.activeReaderManga.collectAsStateWithLifecycle()
     val isLoadingPages by viewModel.isLoadingPages.collectAsStateWithLifecycle()
+    val isAscendingChapterOrder by viewModel.isAscendingChapterOrder.collectAsStateWithLifecycle()
 
     // Android Back button handling
     BackHandler(enabled = activeChapter != null || selectedManga != null || currentTab != MainNavigationTab.EXPLORE) {
@@ -177,7 +181,13 @@ fun MainAppContent(viewModel: MainViewModel) {
             ReaderScreen(
                 manga = activeReaderManga!!,
                 chapter = activeChapter!!,
+                allChapters = selectedMangaChapters,
                 isLoadingPages = isLoadingPages,
+                isAscending = isAscendingChapterOrder,
+                onToggleOrder = { viewModel.toggleChapterOrder() },
+                onChapterChange = { targetChapter ->
+                    viewModel.openReader(targetChapter, activeReaderManga!!)
+                },
                 onRetryPages = { viewModel.retryActiveChapterPages() },
                 onBackClick = { viewModel.closeReader() }
             )
@@ -188,6 +198,8 @@ fun MainAppContent(viewModel: MainViewModel) {
                 chapters = selectedMangaChapters,
                 isChaptersLoading = isChaptersLoading,
                 isBookmarked = bookmarkedIds.contains(selectedManga!!.id),
+                isAscending = isAscendingChapterOrder,
+                onToggleOrder = { viewModel.toggleChapterOrder() },
                 onBackClick = { viewModel.closeMangaDetails() },
                 onBookmarkToggle = { viewModel.toggleBookmark(selectedManga!!.id) },
                 onChapterClick = { chapter ->
@@ -206,6 +218,7 @@ fun MainAppContent(viewModel: MainViewModel) {
                     HomeScreen(
                         mangas = mangas,
                         selectedSource = selectedSource,
+                        selectedVariety = selectedVariety,
                         selectedTag = selectedTag,
                         availableTags = viewModel.availableTags,
                         continueReadingList = continueReadingList,
@@ -214,14 +227,12 @@ fun MainAppContent(viewModel: MainViewModel) {
                         isLoadingMore = isLoadingMore,
                         hasMore = hasMore,
                         onSourceSelect = { viewModel.selectSource(it) },
+                        onVarietySelect = { viewModel.selectVariety(it) },
                         onTagSelect = { viewModel.selectTag(it) },
                         onMangaClick = { viewModel.openMangaDetails(it) },
                         onBookmarkToggle = { viewModel.toggleBookmark(it) },
                         onContinueReadingClick = { progress ->
-                            val targetManga = mangas.find { it.id == progress.mangaId }
-                            if (targetManga != null) {
-                                viewModel.openMangaDetails(targetManga)
-                            }
+                            viewModel.resumeReading(progress)
                         },
                         onLoadMore = { viewModel.loadMore() },
                         onSearchClick = { currentTab = MainNavigationTab.SEARCH }
@@ -255,17 +266,14 @@ fun MainAppContent(viewModel: MainViewModel) {
                 }
 
                 MainNavigationTab.LIBRARY -> {
-                    val bookmarkedMangas = mangas.filter { bookmarkedIds.contains(it.id) }
+                    val bookmarkedMangas = bookmarkedMangasMap.values.toList()
                     LibraryScreen(
                         bookmarkedMangas = bookmarkedMangas,
                         readingHistory = continueReadingList,
                         onMangaClick = { viewModel.openMangaDetails(it) },
                         onBookmarkToggle = { viewModel.toggleBookmark(it) },
                         onProgressClick = { progress ->
-                            val targetManga = mangas.find { it.id == progress.mangaId }
-                            if (targetManga != null) {
-                                viewModel.openMangaDetails(targetManga)
-                            }
+                            viewModel.resumeReading(progress)
                         },
                         onTagClick = { tag ->
                             viewModel.selectTag(tag)

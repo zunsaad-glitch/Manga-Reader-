@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.Manga
 import com.example.model.MangaSource
+import com.example.model.MangaVariety
 import com.example.model.ReadingProgress
 import com.example.ui.components.*
 import com.example.ui.theme.*
@@ -36,6 +37,7 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     mangas: List<Manga>,
     selectedSource: MangaSource,
+    selectedVariety: MangaVariety = MangaVariety.ALL_POPULAR,
     selectedTag: String?,
     availableTags: List<String>,
     continueReadingList: List<ReadingProgress>,
@@ -44,6 +46,7 @@ fun HomeScreen(
     isLoadingMore: Boolean,
     hasMore: Boolean,
     onSourceSelect: (MangaSource) -> Unit,
+    onVarietySelect: (MangaVariety) -> Unit = {},
     onTagSelect: (String) -> Unit,
     onMangaClick: (Manga) -> Unit,
     onBookmarkToggle: (String) -> Unit,
@@ -55,8 +58,8 @@ fun HomeScreen(
     val gridState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
 
-    // Smoothly reset scroll position to top whenever provider or tag changes
-    LaunchedEffect(selectedSource, selectedTag) {
+    // Smoothly reset scroll position to top whenever provider, variety or tag changes
+    LaunchedEffect(selectedSource, selectedVariety, selectedTag) {
         gridState.scrollToItem(0)
     }
 
@@ -137,6 +140,23 @@ fun HomeScreen(
                     SourceTabBar(
                         selectedSource = selectedSource,
                         onSourceSelect = onSourceSelect
+                    )
+                }
+            }
+
+            // Enriched Variety & Category Selector
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column(modifier = Modifier.padding(top = 10.dp)) {
+                    Text(
+                        text = "Explore Varieties & Rankings",
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                    VarietyTabBar(
+                        selectedVariety = selectedVariety,
+                        onVarietySelect = onVarietySelect
                     )
                 }
             }

@@ -3,6 +3,7 @@ package com.example.repository
 import com.example.model.Chapter
 import com.example.model.Manga
 import com.example.model.MangaSource
+import com.example.model.MangaVariety
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -77,22 +78,26 @@ class MangaRepository {
     private val mangaCache = ConcurrentHashMap<String, Manga>()
     private val queryCache = ConcurrentHashMap<String, List<Manga>>()
 
+    fun getCachedManga(id: String): Manga? = mangaCache[id]
+
     private fun buildCacheKey(
         source: MangaSource,
         page: Int,
         selectedTag: String?,
         searchQuery: String?,
-        contentRatings: Set<String>
-    ): String = "${source.name}_p${page}_tag_${selectedTag ?: "all"}_q_${searchQuery?.trim()?.lowercase() ?: ""}_ratings_${contentRatings.sorted().joinToString()}"
+        contentRatings: Set<String>,
+        variety: MangaVariety
+    ): String = "${source.name}_v${variety.name}_p${page}_tag_${selectedTag ?: "all"}_q_${searchQuery?.trim()?.lowercase() ?: ""}_ratings_${contentRatings.sorted().joinToString()}"
 
     fun getCachedMangas(
         source: MangaSource,
         page: Int,
         selectedTag: String? = null,
         searchQuery: String? = null,
-        contentRatings: Set<String> = setOf("safe", "suggestive", "erotica", "pornographic")
+        contentRatings: Set<String> = setOf("safe", "suggestive", "erotica", "pornographic"),
+        variety: MangaVariety = MangaVariety.ALL_POPULAR
     ): List<Manga>? {
-        val key = buildCacheKey(source, page, selectedTag, searchQuery, contentRatings)
+        val key = buildCacheKey(source, page, selectedTag, searchQuery, contentRatings, variety)
         return queryCache[key]
     }
 
@@ -101,9 +106,10 @@ class MangaRepository {
         page: Int,
         selectedTag: String? = null,
         searchQuery: String? = null,
-        contentRatings: Set<String> = setOf("safe", "suggestive", "erotica", "pornographic")
+        contentRatings: Set<String> = setOf("safe", "suggestive", "erotica", "pornographic"),
+        variety: MangaVariety = MangaVariety.ALL_POPULAR
     ): List<Manga> = withContext(Dispatchers.IO) {
-        val key = buildCacheKey(source, page, selectedTag, searchQuery, contentRatings)
+        val key = buildCacheKey(source, page, selectedTag, searchQuery, contentRatings, variety)
 
         // Instant return from in-memory cache if available
         queryCache[key]?.let { cachedList ->
@@ -112,7 +118,7 @@ class MangaRepository {
             }
         }
 
-        val networkList = fetchMangasFromNetwork(source, page, selectedTag, searchQuery, contentRatings)
+        val networkList = fetchMangasFromNetwork(source, page, selectedTag, searchQuery, contentRatings, variety)
         if (networkList.isNotEmpty()) {
             queryCache[key] = networkList
             networkList.forEach { mangaCache[it.id] = it }
@@ -121,9 +127,9 @@ class MangaRepository {
             if (page < 50 && searchQuery.isNullOrBlank()) {
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        val nextKey = buildCacheKey(source, page + 1, selectedTag, searchQuery, contentRatings)
+                        val nextKey = buildCacheKey(source, page + 1, selectedTag, searchQuery, contentRatings, variety)
                         if (!queryCache.containsKey(nextKey)) {
-                            val nextPageList = fetchMangasFromNetwork(source, page + 1, selectedTag, searchQuery, contentRatings)
+                            val nextPageList = fetchMangasFromNetwork(source, page + 1, selectedTag, searchQuery, contentRatings, variety)
                             if (nextPageList.isNotEmpty()) {
                                 queryCache[nextKey] = nextPageList
                                 nextPageList.forEach { mangaCache[it.id] = it }
@@ -154,7 +160,8 @@ class MangaRepository {
         page: Int,
         selectedTag: String?,
         searchQuery: String?,
-        contentRatings: Set<String>
+        contentRatings: Set<String>,
+        variety: MangaVariety = MangaVariety.ALL_POPULAR
     ): List<Manga> {
         try {
             val limit = 28 // Generous batch size for smooth continuous scrolling
@@ -171,12 +178,82 @@ class MangaRepository {
                 urlBuilder.addQueryParameter("contentRating[]", rating)
             }
 
-            // Ordering: relevance when searching, popularity when browsing
+            // Ordering & Variety parameters:
             if (!searchQuery.isNullOrBlank()) {
                 urlBuilder.addQueryParameter("order[relevance]", "desc")
                 urlBuilder.addQueryParameter("title", searchQuery.trim())
             } else {
-                urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                when (variety) {
+                    MangaVariety.ALL_POPULAR -> {
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.TOP_RATED -> {
+                        urlBuilder.addQueryParameter("order[rating]", "desc")
+                    }
+                    MangaVariety.LATEST_UPDATES -> {
+                        urlBuilder.addQueryParameter("order[latestUploadedChapter]", "desc")
+                    }
+                    MangaVariety.COMPLETED -> {
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                        urlBuilder.addQueryParameter("status[]", "completed")
+                    }
+                    MangaVariety.MANHWA -> {
+                        urlBuilder.addQueryParameter("originalLanguage[]", "ko")
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.MANHUA -> {
+                        urlBuilder.addQueryParameter("originalLanguage[]", "zh")
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.ROMANCE -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "423e2eae-a7a2-4a8b-ac03-a8351462d71d") // Romance
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.ISEKAI -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "ace04997-f6bd-436e-b261-779182193d3d") // Isekai
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.ACTION -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "391b0423-d847-456f-aff0-8b0cfc03066b") // Action
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.PSYCHOLOGICAL -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "3b60b75c-a2d7-4860-ab56-05f391bb889c") // Psychological
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.DARK_FANTASY -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "cdad7e68-1419-41dd-bdce-27753074a640") // Horror
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.COMEDY -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "4d32cc48-9f00-4cca-9b5a-a839f0764984") // Comedy
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.SLICE_OF_LIFE -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "e5301a23-ebd9-49dd-a0cb-2add944c7fe9") // Slice of Life
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.SCI_FI -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "256c8bd9-4904-4360-bf4f-508a76d67183") // Sci-Fi
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.MARTIAL_ARTS -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "799c202e-7daa-44eb-9cf7-8a3c0441531e") // Martial Arts
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.MYSTERY -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "ee968100-4191-4968-93d3-f82d72be7e46") // Mystery
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.SUPERNATURAL -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "eabc5b4c-6aff-42f3-b657-3e90cbd00b75") // Supernatural
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                    MangaVariety.SPORTS -> {
+                        urlBuilder.addQueryParameter("includedTags[]", "69964a64-2f90-4d33-beeb-f3ed2875eb4c") // Sports
+                        urlBuilder.addQueryParameter("order[followedCount]", "desc")
+                    }
+                }
             }
 
             // Provider originalLanguage routing:
@@ -419,7 +496,7 @@ class MangaRepository {
                     }
 
                     if (chapters.isNotEmpty()) {
-                        return chapters.distinctBy { it.id }.sortedByDescending { it.chapterNumber }
+                        return chapters.distinctBy { it.id }.sortedBy { it.chapterNumber }
                     }
                 }
             }
